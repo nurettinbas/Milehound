@@ -700,6 +700,14 @@ struct LiveFollowMapKitView: UIViewRepresentable {
         private static let tipRefreshInterval: CFTimeInterval = 0.10
         private static let tipRefreshMeters: CLLocationDistance = 0.8
 
+        /// MapKit fades a newly added overlay in over roughly a quarter second. Dropping the
+        /// stroke it replaces in the same pass leaves the trail half transparent for that
+        /// fade — invisible under the puck up close, a pale flash along the whole trail when
+        /// zoomed out. Replaced trail overlays stay under their successor this long.
+        private static let trailRetireDelay: CFTimeInterval = 0.45
+        private var retiredTrail: [(overlay: MKOverlay, at: CFTimeInterval)] = []
+        private var retireFlushScheduled = false
+
         init(
             session: LiveFollowSession,
             onUserBreakFollow: @escaping () -> Void
@@ -832,6 +840,7 @@ struct LiveFollowMapKitView: UIViewRepresentable {
                 guard !drawingSuspended else { return }
                 drawingSuspended = true
                 map.removeOverlays(map.overlays)
+                retiredTrail.removeAll()
                 tipOverlay = nil
                 tipCasing = nil
                 plannedChunks.removeAll()
@@ -1091,15 +1100,14 @@ struct LiveFollowMapKitView: UIViewRepresentable {
             replaceTipOverlay(points, on: map)
         }
 
-        /// Adds the replacement before dropping the old overlay so the stroke never blinks.
+        /// The old stroke stays under the replacement until its fade-in is over, so it never blinks.
         private func replaceTipOverlay(_ points: [CLLocationCoordinate2D]?, on map: MKMapView) {
             let previous = tipOverlay
             let previousCasing = tipCasing
             if let points, points.count >= 2 {
-                // Casing first, so the trail lands on top of its white edge.
                 let casing = TrailCasingPolyline(coordinates: points, count: points.count)
                 tipCasing = casing
-                map.addOverlay(casing, level: .aboveRoads)
+                addTrailCasing(casing, on: map)
                 let next = MKPolyline(coordinates: points, count: points.count)
                 tipOverlay = next
                 map.addOverlay(next, level: .aboveRoads)
@@ -1107,11 +1115,47 @@ struct LiveFollowMapKitView: UIViewRepresentable {
                 tipOverlay = nil
                 tipCasing = nil
             }
-            if let previous {
-                map.removeOverlay(previous)
+            retireTrailOverlays([previous, previousCasing].compactMap { $0 }, on: map)
+        }
+
+        /// Under every traveled stroke, not on top of the stroke it replaces: a white edge
+        /// fading in over the old trail reads as the trail flashing pale.
+        private func addTrailCasing(_ casing: TrailCasingPolyline, on map: MKMapView) {
+            if let lowestTrail = map.overlays(in: .aboveRoads).first(where: {
+                LiveFollowOverlayRole.of($0) == .traveled
+            }) {
+                map.insertOverlay(casing, below: lowestTrail)
+            } else {
+                map.addOverlay(casing, level: .aboveRoads)
             }
-            if let previousCasing {
-                map.removeOverlay(previousCasing)
+        }
+
+        private func retireTrailOverlays(_ overlays: [MKOverlay], on map: MKMapView) {
+            let now = CACurrentMediaTime()
+            flushRetiredTrail(on: map, now: now)
+            guard !overlays.isEmpty else { return }
+            retiredTrail.append(contentsOf: overlays.map { (overlay: $0, at: now) })
+            scheduleRetiredTrailFlush()
+        }
+
+        private func flushRetiredTrail(on map: MKMapView, now: CFTimeInterval) {
+            let expired = retiredTrail.prefix { now - $0.at >= Self.trailRetireDelay }
+            guard !expired.isEmpty else { return }
+            map.removeOverlays(expired.map { $0.overlay })
+            retiredTrail.removeFirst(expired.count)
+        }
+
+        /// Pause and a stopped car stop the tip swaps, so expired strokes need their own pass.
+        private func scheduleRetiredTrailFlush() {
+            guard !retireFlushScheduled, let oldest = retiredTrail.first else { return }
+            retireFlushScheduled = true
+            let wait = max(0, oldest.at + Self.trailRetireDelay - CACurrentMediaTime()) + 0.02
+            DispatchQueue.main.asyncAfter(deadline: .now() + wait) { [weak self] in
+                guard let self else { return }
+                self.retireFlushScheduled = false
+                guard let map = self.mapView else { return }
+                self.flushRetiredTrail(on: map, now: CACurrentMediaTime())
+                self.scheduleRetiredTrailFlush()
             }
         }
 
@@ -1149,14 +1193,9 @@ struct LiveFollowMapKitView: UIViewRepresentable {
                         historyCasings[key] = casing
                         historyChunks[key] = line
                         historyChunkCounts[key] = count
-                        map.addOverlay(casing, level: .aboveRoads)
+                        addTrailCasing(casing, on: map)
                         map.addOverlay(line, level: .aboveRoads)
-                        if let previous {
-                            map.removeOverlay(previous)
-                        }
-                        if let previousCasing {
-                            map.removeOverlay(previousCasing)
-                        }
+                        retireTrailOverlays([previous, previousCasing].compactMap { $0 }, on: map)
                     }
 
                     start = end

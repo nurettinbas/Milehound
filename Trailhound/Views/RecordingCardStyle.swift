@@ -191,29 +191,38 @@ struct RecordingRouteChip: View {
         )
     }
 
+    private var rowInk: Color {
+        embedded ? shellPalette.tintColor(for: colorScheme) : ink
+    }
+
     var body: some View {
         Button {
             TrailhoundHaptics.selection()
             action()
         } label: {
-            HStack(spacing: 4) {
+            HStack(spacing: embedded ? 6 : 4) {
                 leading
                 Text(title)
                     .font(.caption.weight(.bold))
                     .monospacedDigit()
-                    .foregroundStyle(ink)
+                    .foregroundStyle(rowInk)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
-            }
-            .padding(.horizontal, wide ? 12 : 8)
-            .padding(.vertical, embedded ? 8 : (wide ? 5 : 3))
-            .frame(maxWidth: wide ? .infinity : nil)
-            .background {
-                if !embedded {
-                    LiveMapHUDPlate(shape: Capsule())
+                if embedded {
+                    Spacer(minLength: 4)
+                    Image(systemName: "chevron.right")
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(shellPalette.tintColor(for: colorScheme))
+                        .accessibilityHidden(true)
                 }
             }
-            .contentShape(embedded ? AnyShape(Rectangle()) : AnyShape(Capsule()))
+            .padding(.horizontal, wide ? 12 : 8)
+            .padding(.vertical, embedded ? 7 : (wide ? 5 : 3))
+            .frame(maxWidth: wide ? .infinity : nil)
+            .background {
+                LiveMapHUDPlate(shape: Capsule())
+            }
+            .contentShape(AnyShape(Capsule()))
         }
         .buttonStyle(.glassPlainHit)
         .accessibilityElement(children: .ignore)
@@ -231,15 +240,15 @@ struct RecordingRouteChip: View {
         case .setDestination:
             Image(systemName: "flag.fill")
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(ink)
+                .foregroundStyle(rowInk)
         case .loading:
             ProgressView()
                 .controlSize(.mini)
-                .tint(ink)
+                .tint(rowInk)
         case .offline:
             Image(systemName: "wifi.slash")
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(ink)
+                .foregroundStyle(rowInk)
         case .failed:
             Image(systemName: "exclamationmark.triangle.fill")
                 .font(.caption.weight(.semibold))
@@ -247,7 +256,7 @@ struct RecordingRouteChip: View {
         case .estimate:
             Image(systemName: "flag.checkered")
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(ink)
+                .foregroundStyle(rowInk)
         }
     }
 

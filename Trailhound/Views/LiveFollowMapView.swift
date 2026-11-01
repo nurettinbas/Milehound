@@ -76,10 +76,6 @@ struct LiveFollowMapView: View {
         recordingService.state == .paused
     }
 
-    private var statusText: String {
-        isPaused ? L10n.recordingPaused : L10n.recordingStarted
-    }
-
     private var tipCoordinate: CLLocationCoordinate2D? {
         session.vehicleCoordinate
             ?? locationService.lastLocation?.coordinate
@@ -173,6 +169,7 @@ struct LiveFollowMapView: View {
                         topInset: topInset,
                         bottomInset: bottomInset,
                         leadingInset: leadingChromeInset(safe: safe),
+                        hudLeadingInset: hudLeadingInset(safe: safe),
                         gpsClearance: gpsCameraClearance(safe: safe)
                     )
 
@@ -302,6 +299,7 @@ struct LiveFollowMapView: View {
         topInset: CGFloat,
         bottomInset: CGFloat,
         leadingInset: CGFloat,
+        hudLeadingInset: CGFloat,
         gpsClearance: CGFloat
     ) -> some View {
         let hudBottom = pinsHUDToLeadingCorner
@@ -349,7 +347,7 @@ struct LiveFollowMapView: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.leading, leadingInset)
+            .padding(.leading, hudLeadingInset)
             .padding(.trailing, 12)
             .padding(.bottom, hudBottom)
                 .opacity(chromeReveal)
@@ -445,34 +443,15 @@ struct LiveFollowMapView: View {
                 TrailhoundHaptics.selection()
                 beginClose()
             } label: {
-                GlassNavCircleIcon(systemName: "xmark")
+                GlassNavCircleIcon(systemName: "chevron.backward")
             }
             .buttonStyle(.glassPlainHit)
-            .accessibilityLabel(L10n.string("recording.live_map.close"))
+            .accessibilityLabel(L10n.string("onboarding.back"))
             .accessibilityIdentifier("liveMap.close")
 
             if isPaused {
                 pauseStatusChip(font: .caption.weight(.bold), iconSize: 13, horizontal: 8, vertical: 6)
                     .fixedSize(horizontal: true, vertical: true)
-            } else {
-                HStack(spacing: 4) {
-                    Image(systemName: "record.circle.fill")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(Color.red)
-                        .symbolEffect(
-                            .pulse,
-                            options: .repeating,
-                            isActive: !reduceMotion && mapMounted
-                        )
-                    Text(statusText)
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(GlassText.primary(for: colorScheme))
-                        .lineLimit(1)
-                }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 6)
-                .glassChrome(cornerRadius: 14)
-                .fixedSize(horizontal: true, vertical: true)
             }
 
             if gpsBadgeLeads {
@@ -498,22 +477,28 @@ struct LiveFollowMapView: View {
         }
     }
 
-    /// Phone and iPad: beside the status chip, on the leading edge. The open Duo and the
+    /// Phone and iPad: on the leading edge, beside Back. The open Duo and the
     /// closed landscape cover keep it trailing, clear of the corner camera.
     private var gpsBadgeLeads: Bool {
         layout.layoutClass != .duoOpen && !landscapeDuoCover
     }
 
     private var gpsBadge: some View {
-        GPSQualityBadge(quality: session.displayedGPSQuality)
+        GPSQualityBadge(quality: session.displayedGPSQuality, compact: true)
             .fixedSize(horizontal: true, vertical: true)
     }
 
-    /// Camera hole on the leading edge: clear it. On the trailing edge the left side is open, so Close and the stat stack sit on the pane edge.
+    /// Camera hole on the leading edge: the top row clears it. The stat stack sits lower, beside empty bezel, so it does not.
     private func leadingChromeInset(safe: UIEdgeInsets) -> CGFloat {
         let hole = layoutDirection == .rightToLeft ? safe.right : safe.left
         if hole >= 44 { return hole + 8 }
         return 12
+    }
+
+    /// Duration, speed, and distance. Landscape keeps them on the pane edge in both rotations.
+    private func hudLeadingInset(safe: UIEdgeInsets) -> CGFloat {
+        if layout.isLandscape { return 8 }
+        return leadingChromeInset(safe: safe)
     }
 
     /// The punch-hole sits in the trailing corner, and the map ignores that inset.
@@ -1113,6 +1098,9 @@ struct LiveFollowRouteCard: View {
                         .padding(.horizontal, 12)
                 }
                 RecordingRouteChip(content: content, action: action, wide: true, embedded: true)
+                    .padding(.horizontal, 8)
+                    .padding(.top, 6)
+                    .padding(.bottom, 8)
             }
             .background { LiveMapHUDPlate(shape: shape) }
             .clipShape(shape)
@@ -1173,6 +1161,7 @@ struct LiveFollowRouteCard: View {
             }
             Text(title)
                 .font(.caption2.weight(.semibold))
+                .foregroundStyle(shellPalette.tintColor(for: colorScheme))
                 .multilineTextAlignment(.center)
                 .lineLimit(lineLimit)
                 .minimumScaleFactor(0.85)

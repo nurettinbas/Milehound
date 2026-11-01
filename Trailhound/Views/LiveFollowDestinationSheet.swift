@@ -55,8 +55,7 @@ struct LiveFollowDestinationOption: Identifiable, Equatable {
     }
 }
 
-/// Live-map destination picker. Saved places are one tap at any speed; search is typed only
-/// while the car is stopped or the trip is paused (`DestinationEntryPolicy`).
+/// Live-map destination picker. Saved places and search stay available while the trip continues.
 struct LiveFollowDestinationSheet: View {
     var currentDestination: PlannedRouteDestination?
     var searchCenter: CLLocationCoordinate2D?
@@ -114,12 +113,6 @@ struct LiveFollowDestinationSheet: View {
         .modifier(LiveFollowDestinationPresentation(formSizing: Self.usesFormSizing(layout)))
         .onChange(of: query) { _, _ in
             scheduleSearch()
-        }
-        .onChange(of: allowsSearch) { _, allowed in
-            if !allowed {
-                cancelSearch()
-                query = ""
-            }
         }
         .onDisappear {
             cancelSearch()

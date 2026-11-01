@@ -211,17 +211,13 @@ enum PlannedRouteProgress {
     }
 }
 
-/// Destination entry while recording. Saved places are one tap at any speed;
-/// typing a search waits until the car is stopped or the trip is paused.
+/// Destination entry while recording. Saved places and search stay available at any speed.
+/// Typing is optional; the trip does not ask for it.
 enum DestinationEntryPolicy {
-    /// Above this the car is moving (about 7 km/h — walking pace in a car park).
-    static let movingSpeedMps: Double = 2
     static let maxQueryLength = 120
 
-    /// Core Location reports `-1` when speed is unknown. Recording treats that as 0.
-    static func allowsSearch(speedMps: Double, isPaused: Bool) -> Bool {
-        if isPaused { return true }
-        return max(0, speedMps) <= movingSpeedMps
+    static func allowsSearch(speedMps _: Double, isPaused _: Bool) -> Bool {
+        true
     }
 
     static func sanitizedQuery(_ raw: String) -> String {

@@ -850,12 +850,12 @@ final class LiveMapPlannedRouteUITests: LiveMapPlannedRouteUITestCase {
 final class LiveMapPlannedRouteMovingUITests: LiveMapPlannedRouteUITestCase {
     override var extraLaunchArguments: [String] { ["-UITesting.plannedRouteSeed", "-UITesting.plannedRouteMoving"] }
 
-    func testSearchLocksWhileMovingButSavedPlacesStayOneTap() throws {
+    func testSearchStaysOpenWhileMoving() throws {
         try openLiveMap()
         element("liveMap.destination").tap()
 
-        XCTAssertTrue(element("destinationSheet.search.locked").waitForExistence(timeout: uiTimeout))
-        XCTAssertFalse(element("destinationSheet.search").exists)
+        XCTAssertTrue(element("destinationSheet.search").waitForExistence(timeout: uiTimeout))
+        XCTAssertFalse(element("destinationSheet.search.locked").exists)
         let place = element(seedPlaceIdentifier)
         XCTAssertTrue(place.waitForExistence(timeout: uiTimeout))
         place.tap()

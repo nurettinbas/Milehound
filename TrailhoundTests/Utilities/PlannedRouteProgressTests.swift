@@ -100,16 +100,13 @@ final class PlannedRouteProgressTests: XCTestCase {
 }
 
 final class DestinationEntryPolicyTests: XCTestCase {
-    func testSearchOpensWhenStoppedOrPaused() {
+    func testSearchStaysOpenAtAnySpeed() {
         XCTAssertTrue(DestinationEntryPolicy.allowsSearch(speedMps: 0, isPaused: false))
         XCTAssertTrue(DestinationEntryPolicy.allowsSearch(speedMps: -1, isPaused: false))
         XCTAssertTrue(DestinationEntryPolicy.allowsSearch(speedMps: 2, isPaused: false))
+        XCTAssertTrue(DestinationEntryPolicy.allowsSearch(speedMps: 2.1, isPaused: false))
+        XCTAssertTrue(DestinationEntryPolicy.allowsSearch(speedMps: 15, isPaused: false))
         XCTAssertTrue(DestinationEntryPolicy.allowsSearch(speedMps: 25, isPaused: true))
-    }
-
-    func testSearchLocksWhileMoving() {
-        XCTAssertFalse(DestinationEntryPolicy.allowsSearch(speedMps: 2.1, isPaused: false))
-        XCTAssertFalse(DestinationEntryPolicy.allowsSearch(speedMps: 15, isPaused: false))
     }
 
     func testQueryIsCapped() {
