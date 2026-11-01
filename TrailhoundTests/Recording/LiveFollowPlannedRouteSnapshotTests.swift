@@ -113,6 +113,54 @@ final class LiveFollowPlannedRouteSnapshotTests: XCTestCase {
         }
     }
 
+    func testLiveFollowHUDAcrossLayouts() {
+        let sample = LiveFollowHUDSample(duration: "9:49", speed: "100 km/h", distance: "19.4 km")
+        withSnapshotTesting(record: .missing) {
+            for layoutCase in layouts {
+                let layout = TrailhoundLayoutResolver.snapshot(
+                    horizontal: layoutCase.horizontal,
+                    vertical: layoutCase.vertical,
+                    size: layoutCase.size,
+                    idiom: layoutCase.idiom
+                )
+                let fillsPane = layout.splitsRecording || layout.pinsRecordingCardToFold
+                let landscapeCover = !fillsPane
+                    && layout.layoutClass == .phoneLandscape
+                    && !layout.isPhoneBook
+                let mapWidth = liveMapWidth(layout)
+                for scheme in schemes {
+                    for paused in [false, true] {
+                        let state = paused ? "paused" : "recording"
+                        assertHUD(
+                            sample: sample,
+                            mapWidth: mapWidth,
+                            scheme: scheme.1,
+                            palette: .sky,
+                            paused: paused,
+                            tight: landscapeCover,
+                            named: "\(layoutCase.name)-\(scheme.0)-\(state)"
+                        )
+                    }
+                }
+            }
+            let phone = TrailhoundLayoutResolver.snapshot(
+                horizontal: .compact,
+                vertical: .regular,
+                size: CGSize(width: 390, height: 844),
+                idiom: .phone
+            )
+            assertHUD(
+                sample: sample,
+                mapWidth: phone.size.width,
+                scheme: .light,
+                palette: .rose,
+                paused: false,
+                tight: false,
+                named: "phone-rose-light-recording"
+            )
+        }
+    }
+
     func testRouteChipStates() {
         let states: [(String, RecordingRouteChip.Content)] = [
             ("set", .setDestination),
@@ -147,6 +195,99 @@ final class LiveFollowPlannedRouteSnapshotTests: XCTestCase {
                 assertHosted(root, size: variant.4, scheme: variant.1, named: "chip-\(variant.0)")
             }
         }
+    }
+
+    func testMissedTurnNotices() {
+        withSnapshotTesting(record: .missing) {
+            for scheme in [ColorScheme.light, ColorScheme.dark] {
+                let root = ZStack {
+                    LiveFollowChipBackdrop(scheme: scheme)
+                    LiveFollowRouteNotices(missedTurn: true, isRerouting: true)
+                        .padding(16)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                }
+                .environment(\.colorScheme, scheme)
+                .environment(\.shellPalette, .sky)
+                .frame(width: 280, height: 120)
+                assertHosted(
+                    root,
+                    size: CGSize(width: 280, height: 120),
+                    scheme: scheme,
+                    named: "notices-\(scheme == .dark ? "dark" : "light")"
+                )
+                let maneuver = ZStack {
+                    LiveFollowChipBackdrop(scheme: scheme)
+                    LiveFollowRouteNotices(
+                        missedTurn: false,
+                        isRerouting: false,
+                        maneuver: UpcomingManeuver(distanceMeters: 400, instruction: "Turn left")
+                    )
+                    .padding(16)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                }
+                .environment(\.colorScheme, scheme)
+                .environment(\.shellPalette, .sky)
+                .frame(width: 280, height: 120)
+                assertHosted(
+                    maneuver,
+                    size: CGSize(width: 280, height: 120),
+                    scheme: scheme,
+                    named: "maneuver-\(scheme == .dark ? "dark" : "light")"
+                )
+            }
+        }
+    }
+
+    /// Cover and the upright fold use the window. A split map uses half the window.
+    private func liveMapWidth(_ layout: TrailhoundLayoutSnapshot) -> CGFloat {
+        let fillsPane = layout.splitsRecording || layout.pinsRecordingCardToFold
+        if !fillsPane || layout.pinsRecordingCardToFold {
+            return layout.size.width
+        }
+        let gutter: CGFloat = 24
+        return max(280, (layout.size.width - gutter) / 2)
+    }
+
+    private func assertHUD(
+        sample: LiveFollowHUDSample,
+        mapWidth: CGFloat,
+        scheme: ColorScheme,
+        palette: ShellPalette,
+        paused: Bool,
+        tight: Bool,
+        named name: String,
+        file: StaticString = #filePath,
+        testName: String = #function,
+        line: UInt = #line
+    ) {
+        let canvas = CGSize(width: mapWidth, height: 520)
+        let root = ZStack(alignment: .bottomLeading) {
+            Color(white: scheme == .dark ? 0.15 : 0.78)
+            LiveFollowHUD(
+                tight: tight,
+                isPaused: paused,
+                uses3D: false,
+                isFollowing: true,
+                stats: sample,
+                onPause: {},
+                onStop: {},
+                onSelectDimension: { _ in },
+                onOverview: {},
+                onRecenter: {}
+            ) {
+                RecordingRouteChip(
+                    content: .estimate(distance: "12.4 km", arrival: "19:36"),
+                    action: {},
+                    wide: true
+                )
+            }
+            .padding(.horizontal, 12)
+            .padding(.bottom, 12)
+        }
+        .environment(\.shellPalette, palette)
+        .environment(\.colorScheme, scheme)
+        .frame(width: canvas.width, height: canvas.height)
+        assertHosted(root, size: canvas, scheme: scheme, named: name, file: file, testName: testName, line: line)
     }
 
     private func assertSheet(

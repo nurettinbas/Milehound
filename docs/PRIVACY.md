@@ -18,7 +18,7 @@ Location is used for recording drives (app functionality). It is not sent to Tra
 
 ## Maps and directions (Apple MapKit)
 
-Map tiles, place search, street names for trip ends, and the **planned route** on the live map come from Apple’s MapKit. When you pick a destination on the live map, the app sends your current position and that destination to Apple to get driving directions; when you type a place search, the text and the map area go to Apple. These requests go straight from your iPhone to Apple under [Apple’s privacy policy](https://www.apple.com/legal/privacy/). Trailhound has no server in between, receives none of it, and does not save the destination or the planned route — they are held in memory only while that recording runs and are cleared when it ends.
+Map tiles, place search, street names for trip ends, and the **planned route** on the live map come from Apple’s MapKit. When you pick a destination on the live map, the app sends your current position and that destination to Apple to get driving directions; when you type a place search, the text and the map area go to Apple. Apple’s reply includes the next turn and how far it is. That phrase is shown on the map and is not saved. These requests go straight from your iPhone to Apple under [Apple’s privacy policy](https://www.apple.com/legal/privacy/). Trailhound has no server in between, receives none of it, and does not save the destination or the planned route — they are held in memory only while that recording runs and are cleared when it ends.
 
 ## Report a problem (optional)
 

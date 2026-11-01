@@ -1,15 +1,32 @@
 import CoreLocation
 import Foundation
 
+/// One Apple driving step. The instruction is Apple's text; the distance is that step's length.
+struct RouteStep: Equatable, Sendable {
+    var instruction: String
+    var distanceMeters: CLLocationDistance
+}
+
+/// The next maneuver to show, and how far it is. Not a button.
+struct UpcomingManeuver: Equatable, Sendable {
+    var distanceMeters: CLLocationDistance
+    var instruction: String
+}
+
 /// Where the vehicle sits on the planned route, and when to ask MapKit again.
 /// Pure geometry — no MapKit, no SwiftData.
 enum PlannedRouteProgress {
     /// Farther than this from the line counts as off route.
     static let offRouteMeters: CLLocationDistance = 75
-    /// Consecutive off-route fixes before a reroute.
-    static let offRouteFixes = 3
-    /// MapKit directions are throttled. Never ask more often than this.
-    static let rerouteInterval: TimeInterval = 30
+    /// Consecutive off-route fixes before another reroute. The first miss of a departure
+    /// does not wait for this many.
+    static let offRouteFixes = 2
+    /// A moving car aimed this far from the road ahead has missed the turn, even while
+    /// it is still close to the junction.
+    static let missedTurnDegrees: CLLocationDirection = 55
+    static let missedTurnMinSpeed: CLLocationSpeed = 4
+    /// MapKit directions are throttled. A further miss waits this long, not half a minute.
+    static let rerouteInterval: TimeInterval = 8
     /// Inside this radius the trip has reached the destination and the route clears.
     static let arrivalMeters: CLLocationDistance = 50
 
@@ -18,6 +35,8 @@ enum PlannedRouteProgress {
         var offRouteMeters: CLLocationDistance
         /// Route length still ahead of the vehicle's projection.
         var remainingMeters: CLLocationDistance
+        /// Direction of the nearest route segment, degrees clockwise from north.
+        var segmentBearing: CLLocationDirection
     }
 
     /// Running distance at every vertex. `result[0] == 0`, `result.last` is the route length.
@@ -46,6 +65,7 @@ enum PlannedRouteProgress {
 
         var bestDistance = CLLocationDistance.greatestFiniteMagnitude
         var bestAlong: CLLocationDistance = 0
+        var bestBearing: CLLocationDirection = 0
         let metresPerDegreeLat = 111_320.0
         let metresPerDegreeLon = metresPerDegreeLat * cos(vehicle.latitude * .pi / 180)
 
@@ -75,11 +95,48 @@ enum PlannedRouteProgress {
                 bestDistance = distance
                 let segment = cumulative[index + 1] - cumulative[index]
                 bestAlong = cumulative[index] + segment * t
+                bestBearing = bearing(coordinates[index], coordinates[index + 1])
             }
         }
 
         guard bestDistance.isFinite else { return nil }
-        return Measure(offRouteMeters: bestDistance, remainingMeters: max(0, total - bestAlong))
+        return Measure(
+            offRouteMeters: bestDistance,
+            remainingMeters: max(0, total - bestAlong),
+            segmentBearing: bestBearing
+        )
+    }
+
+    /// The car has left the road it was meant to follow. One noisy fix is not enough;
+    /// two in a row is the miss, whether that is distance or a wrong heading.
+    static func confirmedMiss(offRouteStreak: Int) -> Bool {
+        offRouteStreak >= offRouteFixes
+    }
+
+    /// True when a moving car is pointed away from the segment it is nearest to.
+    static func missedTheTurn(
+        course: CLLocationDirection,
+        speed: CLLocationSpeed,
+        routeBearing: CLLocationDirection
+    ) -> Bool {
+        guard speed >= missedTurnMinSpeed, course >= 0, routeBearing >= 0 else { return false }
+        return angleDelta(course, routeBearing) >= missedTurnDegrees
+    }
+
+    static func bearing(_ a: CLLocationCoordinate2D, _ b: CLLocationCoordinate2D) -> CLLocationDirection {
+        let metresPerDegreeLat = 111_320.0
+        let metresPerDegreeLon = metresPerDegreeLat * cos(a.latitude * .pi / 180)
+        let east = (b.longitude - a.longitude) * metresPerDegreeLon
+        let north = (b.latitude - a.latitude) * metresPerDegreeLat
+        guard hypot(east, north) > 0.5 else { return -1 }
+        var degrees = atan2(east, north) * 180 / .pi
+        if degrees < 0 { degrees += 360 }
+        return degrees
+    }
+
+    static func angleDelta(_ a: CLLocationDirection, _ b: CLLocationDirection) -> CLLocationDirection {
+        let raw = abs(a - b).truncatingRemainder(dividingBy: 360)
+        return min(raw, 360 - raw)
     }
 
     /// MapKit's travel time scaled by the share of the route still ahead.
@@ -100,6 +157,37 @@ enum PlannedRouteProgress {
     ) -> Bool {
         guard offRouteStreak >= offRouteFixes else { return false }
         return canRequest(lastRequestAt: lastRequestAt, now: now)
+    }
+
+    /// The next spoken step, and the distance until it starts.
+    /// The step the car is on describes the road it is already on, so the banner names the one after it.
+    /// The last step names itself. Empty Apple text is skipped. Distance is rounded to 10 m.
+    static func upcomingManeuver(traveledMeters: CLLocationDistance, steps: [RouteStep]) -> UpcomingManeuver? {
+        guard !steps.isEmpty else { return nil }
+        var starts: [CLLocationDistance] = []
+        starts.reserveCapacity(steps.count)
+        var cursor: CLLocationDistance = 0
+        for step in steps {
+            starts.append(cursor)
+            cursor += max(0, step.distanceMeters)
+        }
+        let traveled = min(max(0, traveledMeters), cursor)
+        var index = 0
+        for candidate in steps.indices where starts[candidate] <= traveled {
+            index = candidate
+        }
+        let spoken = steps.indices.dropFirst(index + 1).first {
+            !steps[$0].instruction.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
+        let chosen = spoken ?? index
+        let text = steps[chosen].instruction.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return nil }
+        let target = spoken == nil ? cursor : starts[chosen]
+        let distance = max(0, target - traveled)
+        return UpcomingManeuver(
+            distanceMeters: (distance / 10).rounded() * 10,
+            instruction: text
+        )
     }
 
     static func canRequest(lastRequestAt: Date?, now: Date) -> Bool {

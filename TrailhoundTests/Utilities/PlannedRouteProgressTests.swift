@@ -68,18 +68,21 @@ final class PlannedRouteProgressTests: XCTestCase {
 
     func testRerouteThresholdAndThrottle() {
         let now = Date(timeIntervalSince1970: 10_000)
-        XCTAssertFalse(PlannedRouteProgress.shouldReroute(offRouteStreak: 2, lastRequestAt: nil, now: now))
-        XCTAssertTrue(PlannedRouteProgress.shouldReroute(offRouteStreak: 3, lastRequestAt: nil, now: now))
+        XCTAssertFalse(PlannedRouteProgress.shouldReroute(offRouteStreak: 1, lastRequestAt: nil, now: now))
+        XCTAssertTrue(PlannedRouteProgress.shouldReroute(offRouteStreak: 2, lastRequestAt: nil, now: now))
         XCTAssertFalse(PlannedRouteProgress.shouldReroute(
-            offRouteStreak: 3,
-            lastRequestAt: now.addingTimeInterval(-29),
+            offRouteStreak: 2,
+            lastRequestAt: now.addingTimeInterval(-7),
             now: now
         ))
         XCTAssertTrue(PlannedRouteProgress.shouldReroute(
-            offRouteStreak: 3,
-            lastRequestAt: now.addingTimeInterval(-30),
+            offRouteStreak: 2,
+            lastRequestAt: now.addingTimeInterval(-8),
             now: now
         ))
+        XCTAssertTrue(PlannedRouteProgress.missedTheTurn(course: 90, speed: 12, routeBearing: 0))
+        XCTAssertFalse(PlannedRouteProgress.missedTheTurn(course: 20, speed: 12, routeBearing: 0))
+        XCTAssertFalse(PlannedRouteProgress.missedTheTurn(course: 90, speed: 1, routeBearing: 0))
     }
 
     func testArrivalRadius() {
@@ -164,8 +167,14 @@ final class LiveFollowPlannedRouteMapTests: XCTestCase {
         LiveFollowPlannedRouteStrokeStyle.apply(to: plannedRenderer, color: .systemBlue)
         XCTAssertNil(plannedRenderer.lineDashPattern, "planned route is a solid road, not dots")
         XCTAssertEqual(plannedRenderer.lineWidth, LiveFollowRouteStrokeStyle.solidWidth)
-        XCTAssertLessThan(plannedRenderer.strokeColor?.cgColor.alpha ?? 1, 0.5)
+        XCTAssertEqual(plannedRenderer.strokeColor?.cgColor.alpha ?? 0, 1, accuracy: 0.01)
         XCTAssertEqual(plannedRenderer.lineCap, .butt, "see-through pieces must not overlap as darker dots")
+        let light = LiveFollowPlannedRouteStrokeStyle.lightened(.systemBlue)
+        var red: CGFloat = 0, green: CGFloat = 0, blue: CGFloat = 0, sourceAlpha: CGFloat = 0
+        var lightRed: CGFloat = 0, lightGreen: CGFloat = 0, lightBlue: CGFloat = 0, lightAlpha: CGFloat = 0
+        UIColor.systemBlue.getRed(&red, green: &green, blue: &blue, alpha: &sourceAlpha)
+        light.getRed(&lightRed, green: &lightGreen, blue: &lightBlue, alpha: &lightAlpha)
+        XCTAssertGreaterThan(lightRed + lightGreen + lightBlue, red + green + blue)
 
         let casing = TrailCasingPolyline(coordinates: coordinates, count: coordinates.count)
         XCTAssertEqual(LiveFollowOverlayRole.of(casing), .casing)
@@ -224,10 +233,57 @@ final class LiveFollowPlannedRouteMapTests: XCTestCase {
         let points = coordinates.map(MKMapPoint.init)
         let cumulative = LiveFollowPlannedAhead.cumulative(points)
         let car = MKMapPoint(CLLocationCoordinate2D(latitude: 41.0135, longitude: 29.0 + 15 / 84_000))
-        let cut = try XCTUnwrap(LiveFollowPlannedAhead.advance(vehicle: car, points: points, cumulative: cumulative, fromSegment: 0))
+        let cut = try XCTUnwrap(LiveFollowPlannedAhead.advance(
+            vehicle: car, points: points, cumulative: cumulative, fromSegment: 0, recover: true
+        ))
         XCTAssertEqual(cut.segment, 13)
         let total = try XCTUnwrap(cumulative.last)
         XCTAssertEqual(cut.along / total, 0.675, accuracy: 0.005)
+    }
+
+    func testMissedTurnDoesNotJumpTheCutOrStretchBackToTheCar() throws {
+        let coordinates = (0...20).map { CLLocationCoordinate2D(latitude: 41.0 + Double($0) * 0.001, longitude: 29.0) }
+        let points = coordinates.map(MKMapPoint.init)
+        let cumulative = LiveFollowPlannedAhead.cumulative(points)
+        let car = MKMapPoint(CLLocationCoordinate2D(latitude: 41.0135, longitude: 29.0 + 15 / 84_000))
+        XCTAssertNil(
+            LiveFollowPlannedAhead.advance(vehicle: car, points: points, cumulative: cumulative, fromSegment: 5),
+            "already following: a later stretch must not steal the cut"
+        )
+        XCTAssertFalse(LiveFollowPlannedAhead.attachesLead(distanceMeters: 80, course: 0, routeBearing: 0))
+        XCTAssertFalse(LiveFollowPlannedAhead.attachesLead(distanceMeters: 25, course: 90, routeBearing: 0))
+        XCTAssertTrue(LiveFollowPlannedAhead.attachesLead(distanceMeters: 8, course: 10, routeBearing: 0))
+    }
+
+    func testCutThatFellBehindCatchesUpWhenTheCarDrivesAlongTheRoute() throws {
+        // 2 km north. The cut is stuck at 500 m (app was backgrounded); the car is now at
+        // 1.35 km, one lane beside the line, heading north.
+        let coordinates = (0...20).map { CLLocationCoordinate2D(latitude: 41.0 + Double($0) * 0.001, longitude: 29.0) }
+        let points = coordinates.map(MKMapPoint.init)
+        let cumulative = LiveFollowPlannedAhead.cumulative(points)
+        let car = MKMapPoint(CLLocationCoordinate2D(latitude: 41.0135, longitude: 29.0 + 4 / 84_000))
+        let cut = try XCTUnwrap(LiveFollowPlannedAhead.advance(
+            vehicle: car, points: points, cumulative: cumulative, fromSegment: 5, course: 2
+        ))
+        XCTAssertEqual(cut.segment, 13, "the passed road loses its planned line")
+        let total = try XCTUnwrap(cumulative.last)
+        XCTAssertEqual(cut.along / total, 0.675, accuracy: 0.005)
+    }
+
+    func testCutThatFellBehindHoldsAgainstTheOtherCarriagewayOrALooseMatch() throws {
+        let coordinates = (0...20).map { CLLocationCoordinate2D(latitude: 41.0 + Double($0) * 0.001, longitude: 29.0) }
+        let points = coordinates.map(MKMapPoint.init)
+        let cumulative = LiveFollowPlannedAhead.cumulative(points)
+        let onLine = MKMapPoint(CLLocationCoordinate2D(latitude: 41.0135, longitude: 29.0 + 4 / 84_000))
+        XCTAssertNil(
+            LiveFollowPlannedAhead.advance(vehicle: onLine, points: points, cumulative: cumulative, fromSegment: 5, course: 180),
+            "driving the other way"
+        )
+        let parallelRoad = MKMapPoint(CLLocationCoordinate2D(latitude: 41.0135, longitude: 29.0 + 60 / 84_000))
+        XCTAssertNil(
+            LiveFollowPlannedAhead.advance(vehicle: parallelRoad, points: points, cumulative: cumulative, fromSegment: 5, course: 0),
+            "a parallel road 60 m off"
+        )
     }
 
     func testLeadLeavesThePuckCentreAndEasesOntoTheRoute() throws {
@@ -353,6 +409,32 @@ final class LiveFollowRouteChipContentTests: XCTestCase {
         failed.setDestination(destination, origin: origin)
         await failed.requestTask?.value
         XCTAssertEqual(LiveFollowRouteChipHost.content(for: failed, now: now), .failed)
+    }
+
+    func testUpcomingManeuverNamesTheNextSpokenStep() {
+        let steps = [
+            RouteStep(instruction: "Head north", distanceMeters: 400),
+            RouteStep(instruction: "  ", distanceMeters: 50),
+            RouteStep(instruction: "Turn left", distanceMeters: 200),
+            RouteStep(instruction: "Arrive", distanceMeters: 30)
+        ]
+        let first = PlannedRouteProgress.upcomingManeuver(traveledMeters: 0, steps: steps)
+        XCTAssertEqual(first?.instruction, "Turn left")
+        XCTAssertEqual(first?.distanceMeters ?? -1, 450, accuracy: 0.1)
+
+        let nearTurn = PlannedRouteProgress.upcomingManeuver(traveledMeters: 440, steps: steps)
+        XCTAssertEqual(nearTurn?.instruction, "Turn left")
+        XCTAssertEqual(nearTurn?.distanceMeters ?? -1, 10, accuracy: 0.1)
+
+        let onTurn = PlannedRouteProgress.upcomingManeuver(traveledMeters: 460, steps: steps)
+        XCTAssertEqual(onTurn?.instruction, "Arrive")
+        XCTAssertEqual(onTurn?.distanceMeters ?? -1, 190, accuracy: 0.1)
+
+        XCTAssertNil(PlannedRouteProgress.upcomingManeuver(traveledMeters: 0, steps: []))
+        XCTAssertNil(PlannedRouteProgress.upcomingManeuver(
+            traveledMeters: 0,
+            steps: [RouteStep(instruction: " ", distanceMeters: 10)]
+        ))
     }
 }
 

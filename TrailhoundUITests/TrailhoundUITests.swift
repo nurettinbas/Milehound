@@ -783,6 +783,9 @@ class LiveMapPlannedRouteUITestCase: TrailhoundUITestCase {
         }
         liveMapOpenButton().tap()
         XCTAssertTrue(element("liveMap.destination").waitForExistence(timeout: uiTimeout))
+        XCTAssertTrue(element("liveMap.pause").waitForExistence(timeout: uiTimeout))
+        XCTAssertTrue(element("liveMap.stop").exists)
+        XCTAssertTrue(element("liveMap.speed").exists)
     }
 
     /// The recording card shares the identifier; the map glyph is the smallest match.

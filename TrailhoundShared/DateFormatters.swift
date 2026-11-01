@@ -85,6 +85,17 @@ public enum DateFormatters {
         return String(format: "%d:%02d", minutes, seconds)
     }
 
+    /// Turns stay in metres until a kilometre. Trip totals stay in kilometres.
+    public static func formatManeuverDistance(_ meters: Double) -> String {
+        guard meters < 1_000 else { return formatDistance(meters) }
+        let formatter = MeasurementFormatter()
+        formatter.locale = currentLocale
+        formatter.unitOptions = .providedUnit
+        formatter.unitStyle = .short
+        formatter.numberFormatter.maximumFractionDigits = 0
+        return formatter.string(from: Measurement(value: meters, unit: UnitLength.meters))
+    }
+
     public static func formatDistance(_ meters: Double) -> String {
         let kilometers = meters / 1000
         let formatter = MeasurementFormatter()

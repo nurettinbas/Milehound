@@ -519,7 +519,7 @@ final class TripRecordingService {
         }
 
         applyDistanceSample(from: location, speed: speed)
-        plannedRoute.noteVehicle(location.coordinate)
+        plannedRoute.noteVehicle(location.coordinate, course: location.course, speed: location.speed)
         refreshTripStartedPlaceBodyIfNeeded(coordinate: location.coordinate)
         refreshDisplaySnapshot()
         syncExternalState()

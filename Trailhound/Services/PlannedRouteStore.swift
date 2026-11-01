@@ -24,10 +24,13 @@ struct DrivingRoute: Equatable {
     var coordinates: [CLLocationCoordinate2D]
     var distanceMeters: CLLocationDistance
     var expectedTravelTime: TimeInterval
+    /// Apple's step list. Empty when the provider has no instructions. Not saved.
+    var steps: [RouteStep] = []
 
     static func == (lhs: DrivingRoute, rhs: DrivingRoute) -> Bool {
         lhs.distanceMeters == rhs.distanceMeters
             && lhs.expectedTravelTime == rhs.expectedTravelTime
+            && lhs.steps == rhs.steps
             && lhs.coordinates.count == rhs.coordinates.count
             && zip(lhs.coordinates, rhs.coordinates).allSatisfy {
                 $0.latitude == $1.latitude && $0.longitude == $1.longitude
@@ -66,7 +69,10 @@ struct MapKitDrivingRouteProvider: DrivingRouteProviding {
         return DrivingRoute(
             coordinates: coordinates.filter { CLLocationCoordinate2DIsValid($0) },
             distanceMeters: route.distance,
-            expectedTravelTime: route.expectedTravelTime
+            expectedTravelTime: route.expectedTravelTime,
+            steps: route.steps.map {
+                RouteStep(instruction: $0.instructions, distanceMeters: $0.distance)
+            }
         )
     }
 }
@@ -111,6 +117,12 @@ final class PlannedRouteStore {
     /// Rounded to 10 m so a 1 Hz fix does not re-render the chip for sub-step changes.
     private(set) var remainingMeters: CLLocationDistance?
     private(set) var remainingTravelTime: TimeInterval?
+    /// The car left the planned road. Cleared once a fix is back on the line.
+    private(set) var missedTurn = false
+    /// A replacement route is in flight after a miss. The previous line stays up meanwhile.
+    private(set) var isRerouting = false
+    /// Next Apple maneuver and the distance until it. Memory only, same as the route.
+    private(set) var upcomingManeuver: UpcomingManeuver?
 
     /// Change stamp for the MapKit coordinator (read on display ticks, not in a body).
     @ObservationIgnored private(set) var version = 0
@@ -120,6 +132,9 @@ final class PlannedRouteStore {
     @ObservationIgnored private(set) var requestTask: Task<Void, Never>?
     @ObservationIgnored private var cumulative: [CLLocationDistance] = []
     @ObservationIgnored private var offRouteStreak = 0
+    /// True after this departure already asked for a new route. The next ask waits for the
+    /// throttle, so a route that is still settling cannot request on every fix.
+    @ObservationIgnored private var reroutedThisDeparture = false
     @ObservationIgnored private var lastRequestAt: Date?
     @ObservationIgnored private var generation = 0
     @ObservationIgnored private var lastVehicle: CLLocationCoordinate2D?
@@ -146,7 +161,11 @@ final class PlannedRouteStore {
         cumulative = []
         remainingMeters = nil
         remainingTravelTime = nil
+        upcomingManeuver = nil
         offRouteStreak = 0
+        reroutedThisDeparture = false
+        missedTurn = false
+        isRerouting = false
         lastRequestAt = nil
         status = .loading
         bumpVersion()
@@ -165,7 +184,11 @@ final class PlannedRouteStore {
         cumulative = []
         remainingMeters = nil
         remainingTravelTime = nil
+        upcomingManeuver = nil
         offRouteStreak = 0
+        reroutedThisDeparture = false
+        missedTurn = false
+        isRerouting = false
         lastRequestAt = nil
         lastVehicle = nil
         status = .idle
@@ -175,7 +198,12 @@ final class PlannedRouteStore {
     }
 
     /// Every recorded GPS fix. Updates progress, clears on arrival, and reroutes when off route.
-    func noteVehicle(_ vehicle: CLLocationCoordinate2D) {
+    /// `course` and `speed` come from the same fix; negative means Core Location has none.
+    func noteVehicle(
+        _ vehicle: CLLocationCoordinate2D,
+        course: CLLocationDirection = -1,
+        speed: CLLocationSpeed = -1
+    ) {
         guard CLLocationCoordinate2DIsValid(vehicle) else { return }
         lastVehicle = vehicle
         guard let destination else { return }
@@ -198,33 +226,52 @@ final class PlannedRouteStore {
             cumulative: cumulative
         ) else { return }
 
-        if measure.offRouteMeters > PlannedRouteProgress.offRouteMeters {
+        let headingMiss = PlannedRouteProgress.missedTheTurn(
+            course: course,
+            speed: speed,
+            routeBearing: measure.segmentBearing
+        )
+        let away = measure.offRouteMeters > PlannedRouteProgress.offRouteMeters
+        if away || headingMiss {
             offRouteStreak += 1
         } else {
             offRouteStreak = 0
+            missedTurn = false
+            reroutedThisDeparture = false
         }
         applyRemaining(measure.remainingMeters, route: route)
 
-        if requestTask == nil,
-           PlannedRouteProgress.shouldReroute(
-               offRouteStreak: offRouteStreak,
-               lastRequestAt: lastRequestAt,
-               now: now()
-           )
-        {
-            request(from: vehicle)
+        let confirmed = PlannedRouteProgress.confirmedMiss(offRouteStreak: offRouteStreak)
+        if confirmed {
+            missedTurn = true
         }
+        guard requestTask == nil, confirmed else { return }
+        // The first miss of this departure recalculates immediately. The route that was
+        // just fetched does not count, so a turn missed a few seconds into the drive is
+        // not held back by that request. A further miss waits out the short throttle.
+        if reroutedThisDeparture {
+            guard PlannedRouteProgress.shouldReroute(
+                offRouteStreak: offRouteStreak,
+                lastRequestAt: lastRequestAt,
+                now: now()
+            ) else { return }
+        }
+        reroutedThisDeparture = true
+        request(from: vehicle, reroute: true)
     }
 
-    private func request(from origin: CLLocationCoordinate2D) {
+    private func request(from origin: CLLocationCoordinate2D, reroute: Bool = false) {
         guard let destination else { return }
         cancelRequest()
         lastRequestAt = now()
         offRouteStreak = 0
-        if route == nil {
+        if reroute {
+            isRerouting = true
+        } else if route == nil {
             status = .loading
         }
         guard isConnected() else {
+            isRerouting = false
             if route == nil {
                 status = .offline
             }
@@ -246,8 +293,10 @@ final class PlannedRouteStore {
             case .success(let fetched):
                 self.apply(fetched, origin: origin)
             case .failure:
+                self.isRerouting = false
                 if self.route == nil {
                     self.status = self.isConnected() ? .failed : .offline
+                    self.missedTurn = false
                 }
             }
         }
@@ -256,6 +305,7 @@ final class PlannedRouteStore {
     private func apply(_ fetched: DrivingRoute, origin: CLLocationCoordinate2D) {
         let valid = fetched.coordinates.filter { CLLocationCoordinate2DIsValid($0) }
         guard valid.count >= 2 else {
+            isRerouting = false
             if route == nil {
                 status = .failed
             }
@@ -267,12 +317,15 @@ final class PlannedRouteStore {
             distanceMeters: fetched.distanceMeters > 0
                 ? fetched.distanceMeters
                 : PlannedRouteProgress.cumulativeDistances(display).last ?? 0,
-            expectedTravelTime: max(0, fetched.expectedTravelTime)
+            expectedTravelTime: max(0, fetched.expectedTravelTime),
+            steps: fetched.steps
         )
         route = next
         cumulative = PlannedRouteProgress.cumulativeDistances(display)
         status = .ready
         offRouteStreak = 0
+        missedTurn = false
+        isRerouting = false
         let from = lastVehicle ?? origin
         if let measure = PlannedRouteProgress.measure(vehicle: from, along: display, cumulative: cumulative) {
             applyRemaining(measure.remainingMeters, route: next)
@@ -299,6 +352,11 @@ final class PlannedRouteStore {
         let roundedTime = (time / 30).rounded() * 30
         if remainingTravelTime != roundedTime {
             remainingTravelTime = roundedTime
+        }
+        let traveled = max(0, route.distanceMeters - roadMeters)
+        let next = PlannedRouteProgress.upcomingManeuver(traveledMeters: traveled, steps: route.steps)
+        if upcomingManeuver != next {
+            upcomingManeuver = next
         }
     }
 

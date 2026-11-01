@@ -145,7 +145,7 @@ final class PlannedRouteStoreTests: XCTestCase {
         XCTAssertEqual(store.route?.coordinates.count, northLine.count)
     }
 
-    func testRerouteNeedsThreeOffRouteFixesAndThirtySeconds() async {
+    func testFirstMissReroutesImmediatelyAndTheNextOneWaits() async {
         var clock = Date(timeIntervalSince1970: 1_000)
         let provider = FakeDrivingRouteProvider(result: .success(route()))
         let store = makeStore(provider, clock: { clock })
@@ -153,22 +153,58 @@ final class PlannedRouteStoreTests: XCTestCase {
         await settle(store)
         XCTAssertEqual(provider.callCount, 1)
 
-        // ~400 m east of the line.
+        // ~400 m east of the line, a few seconds after the route was fetched.
         let off = CLLocationCoordinate2D(latitude: 41.005, longitude: 29.005)
         clock = clock.addingTimeInterval(10)
         store.noteVehicle(off)
-        store.noteVehicle(off)
-        store.noteVehicle(off)
-        XCTAssertEqual(provider.callCount, 1, "inside the 30 s throttle")
+        XCTAssertFalse(store.missedTurn, "one fix is not a miss")
+        XCTAssertEqual(provider.callCount, 1)
 
-        clock = clock.addingTimeInterval(25)
         store.noteVehicle(off)
+        XCTAssertTrue(store.missedTurn)
+        XCTAssertTrue(store.isRerouting)
         await settle(store)
         XCTAssertEqual(provider.callCount, 2)
         XCTAssertEqual(provider.lastOrigin?.longitude ?? 0, off.longitude, accuracy: 1e-9)
+        XCTAssertFalse(store.isRerouting)
+        XCTAssertFalse(store.missedTurn)
+
+        // Still off the replacement. A second miss in the same departure waits out the throttle.
+        store.noteVehicle(off)
+        store.noteVehicle(off)
+        XCTAssertEqual(provider.callCount, 2)
+        XCTAssertTrue(store.missedTurn)
+        XCTAssertFalse(store.isRerouting)
+
+        clock = clock.addingTimeInterval(7)
+        store.noteVehicle(off)
+        store.noteVehicle(off)
+        XCTAssertEqual(provider.callCount, 2)
+
+        clock = clock.addingTimeInterval(1)
+        store.noteVehicle(off)
+        store.noteVehicle(off)
+        await settle(store)
+        XCTAssertEqual(provider.callCount, 3)
     }
 
-    func testTwoOffRouteFixesDoNotReroute() async {
+    func testWrongHeadingReroutesWhileStillNearTheJunction() async {
+        var clock = Date(timeIntervalSince1970: 1_000)
+        let provider = FakeDrivingRouteProvider(result: .success(route()))
+        let store = makeStore(provider, clock: { clock })
+        store.setDestination(destination, origin: start)
+        await settle(store)
+
+        clock = clock.addingTimeInterval(20)
+        let onTheLine = northLine[4]
+        store.noteVehicle(onTheLine, course: 90, speed: 12)
+        store.noteVehicle(onTheLine, course: 90, speed: 12)
+        XCTAssertTrue(store.missedTurn)
+        await settle(store)
+        XCTAssertEqual(provider.callCount, 2)
+    }
+
+    func testOneOffRouteFixDoesNotReroute() async {
         var clock = Date(timeIntervalSince1970: 1_000)
         let provider = FakeDrivingRouteProvider(result: .success(route()))
         let store = makeStore(provider, clock: { clock })
@@ -178,8 +214,8 @@ final class PlannedRouteStoreTests: XCTestCase {
         clock = clock.addingTimeInterval(60)
         let off = CLLocationCoordinate2D(latitude: 41.005, longitude: 29.005)
         store.noteVehicle(off)
-        store.noteVehicle(off)
         XCTAssertEqual(provider.callCount, 1)
+        XCTAssertFalse(store.missedTurn)
     }
 
     func testOnRouteFixResetsTheStreak() async {
@@ -192,10 +228,10 @@ final class PlannedRouteStoreTests: XCTestCase {
         clock = clock.addingTimeInterval(60)
         let off = CLLocationCoordinate2D(latitude: 41.005, longitude: 29.005)
         store.noteVehicle(off)
-        store.noteVehicle(off)
         store.noteVehicle(northLine[4])
         store.noteVehicle(off)
         XCTAssertEqual(provider.callCount, 1)
+        XCTAssertFalse(store.missedTurn)
     }
 
     func testArrivalClearsTheRoute() async {

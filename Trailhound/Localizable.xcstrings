@@ -14560,6 +14560,57 @@
         }
       }
     },
+    "recording.live_map.route.maneuver" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In %1$@, %2$@"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ sonra %2$@"
+          }
+        }
+      }
+    },
+    "recording.live_map.route.missed_turn" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Missed the turn"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dönüşü kaçırdın"
+          }
+        }
+      }
+    },
+    "recording.live_map.route.rerouting" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Calculating a new route"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Yeni rota hesaplanıyor"
+          }
+        }
+      }
+    },
     "recording.live_map.route.loading" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -14573,6 +14624,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Rota hesaplanıyor…"
+          }
+        }
+      }
+    },
+    "recording.live_map.speed" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Speed"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hız"
           }
         }
       }

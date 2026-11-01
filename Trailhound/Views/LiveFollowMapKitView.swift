@@ -49,20 +49,36 @@ enum LiveFollowRouteStrokeStyle {
     }
 }
 
-/// Road still ahead: the trail's tint as a solid, see-through line, drawn under the trail.
-/// Same width as the trail, so the two read as one road and the plan never peeks out beside it.
+/// Road still ahead: one solid line, the trail's width, the theme tint lightened toward
+/// white. Opaque, so it stays visible on the road. A second stroke separates in 3D.
 enum LiveFollowPlannedRouteStrokeStyle {
     static let width: CGFloat = LiveFollowRouteStrokeStyle.solidWidth
-    static let alpha: CGFloat = 0.38
+    /// Share of the way from the theme tint toward white.
+    static let lighten: CGFloat = 0.30
 
     static func apply(to renderer: MKOverlayPathRenderer, color: UIColor) {
-        renderer.strokeColor = color.withAlphaComponent(alpha)
+        renderer.strokeColor = lightened(color)
         renderer.lineWidth = width
         // Chunks and the lead share a vertex; round caps would overlap there as darker dots.
         renderer.lineCap = .butt
         renderer.lineJoin = .round
         renderer.miterLimit = 1
         renderer.lineDashPattern = nil
+    }
+
+    static func lightened(_ color: UIColor) -> UIColor {
+        let resolved = color.resolvedColor(with: .current)
+        var red: CGFloat = 0
+        var green: CGFloat = 0
+        var blue: CGFloat = 0
+        var alpha: CGFloat = 0
+        guard resolved.getRed(&red, green: &green, blue: &blue, alpha: &alpha) else { return color }
+        return UIColor(
+            red: red + (1 - red) * lighten,
+            green: green + (1 - green) * lighten,
+            blue: blue + (1 - blue) * lighten,
+            alpha: 1
+        )
     }
 }
 
@@ -80,6 +96,9 @@ enum LiveFollowPlannedAhead {
     /// The search only looks this far ahead of the last cut, so a later part of the route
     /// that runs close by (a U-turn, the other carriageway) can never jump the cut forward.
     static let windowMeters: CLLocationDistance = 400
+    /// Farther than this from the line, the lead lets go of the puck. A longer bridge is the
+    /// snake that reaches back to a turn the car has left.
+    static let attachMeters: CLLocationDistance = 35
     /// The lead eases from the puck onto the route over this distance.
     static let blendMeters: CLLocationDistance = 80
     /// Sample spacing inside the blend, so the ease is a curve and not one long chord.
@@ -194,13 +213,39 @@ enum LiveFollowPlannedAhead {
         return result
     }
 
+    /// The lead holds the puck only while the car is still on the road. Past `attachMeters`,
+    /// or pointed away from it while already well off the centreline, the line stays on the
+    /// route instead of stretching back to the car.
+    static func attachesLead(
+        distanceMeters: CLLocationDistance,
+        course: CLLocationDirection,
+        routeBearing: CLLocationDirection
+    ) -> Bool {
+        if distanceMeters > attachMeters { return false }
+        if distanceMeters > 18,
+           course >= 0,
+           routeBearing >= 0,
+           PlannedRouteProgress.angleDelta(course, routeBearing) >= PlannedRouteProgress.missedTurnDegrees
+        {
+            return false
+        }
+        return true
+    }
+
     /// Next cut from `fromSegment` onward, or nil when the vehicle is not on the line.
+    /// `recover` scans past the window. Only the moment a route is loaded uses it, so a
+    /// missed turn cannot jump the cut onto a later stretch and erase the line in between.
+    /// A valid `course` lets a following cut that fell behind the window (backgrounded, paused,
+    /// GPS gap) catch up, but only onto a stretch the car is on and driving along. Otherwise
+    /// the passed road keeps its planned line beside the trail.
     static func advance(
         vehicle: MKMapPoint,
         points: [MKMapPoint],
         cumulative: [Double],
-        fromSegment: Int
-    ) -> (segment: Int, along: Double)? {
+        fromSegment: Int,
+        recover: Bool = false,
+        course: CLLocationDirection = -1
+    ) -> (segment: Int, along: Double, distanceMeters: CLLocationDistance)? {
         guard points.count >= 2, cumulative.count == points.count, let total = cumulative.last, total > 0 else {
             return nil
         }
@@ -231,13 +276,36 @@ enum LiveFollowPlannedAhead {
             index += 1
         }
         if let best {
-            return (best.segment, best.along)
+            return (best.segment, best.along, best.distance * metersPerPoint)
         }
         // The car is past the window: the map was reopened after a long drive, or GPS dropped
         // out. Pick up the first stretch ahead that the car is on, and refine from there.
+        // While already following, a loose miss stays a miss — scanning here is what made the
+        // line leap to a later part of the route and vanish in between.
+        guard recover else {
+            guard course >= 0 else { return nil }
+            let snug = attachMeters / metersPerPoint
+            while index < points.count - 1 {
+                let bearing = PlannedRouteProgress.bearing(points[index].coordinate, points[index + 1].coordinate)
+                if bearing >= 0,
+                   PlannedRouteProgress.angleDelta(course, bearing) < PlannedRouteProgress.missedTurnDegrees,
+                   project(index).distance <= snug
+                {
+                    return advance(vehicle: vehicle, points: points, cumulative: cumulative, fromSegment: index)
+                }
+                index += 1
+            }
+            return nil
+        }
         while index < points.count - 1 {
             if project(index).distance <= tolerance {
-                return advance(vehicle: vehicle, points: points, cumulative: cumulative, fromSegment: index)
+                return advance(
+                    vehicle: vehicle,
+                    points: points,
+                    cumulative: cumulative,
+                    fromSegment: index,
+                    recover: true
+                )
             }
             index += 1
         }
@@ -547,6 +615,7 @@ struct LiveFollowMapKitView: UIViewRepresentable {
         private var lastRouteVersion = Int.min
         private var plannedChunks: [Int: PlannedRoutePolyline] = [:]
         private var plannedLead: PlannedRoutePolyline?
+        private var plannedDistanceMeters: CLLocationDistance = 0
         private var lastPlannedRouteVersion = Int.min
         private var plannedPoints: [MKMapPoint] = []
         private var plannedCumulative: [Double] = []
@@ -555,6 +624,8 @@ struct LiveFollowMapKitView: UIViewRepresentable {
         private var plannedFirstFixed = 0
         private var lastPlannedLeadAt: CFTimeInterval = 0
         private var lastPlannedLeadVehicle: MKMapPoint?
+        /// Last car position the lead was considered for, whether or not the line held the puck.
+        private var lastPlannedSample: MKMapPoint?
         /// Uncommitted remainder of the growing run — rendered in the tip overlay, so a
         /// new breadcrumb never swaps a history polyline (that 1 Hz remove+add next to
         /// the puck is what read as the route being "glued on in pieces").
@@ -810,14 +881,16 @@ struct LiveFollowMapKitView: UIViewRepresentable {
             let version = session.plannedRouteVersion
             guard version != lastPlannedRouteVersion else { return }
             lastPlannedRouteVersion = version
-            let previous: [MKOverlay] = Array(plannedChunks.values) + (plannedLead.map { [$0] } ?? [])
+            let previous: [MKOverlay] = plannedOverlays()
             plannedChunks.removeAll()
             plannedLead = nil
             let coordinates = session.plannedRouteCoordinates
             if coordinates.count >= 2 {
                 resetPlannedAhead(points: coordinates.map { MKMapPoint($0) })
                 var vehicle = session.vehicleCoordinate
-                if let car = vehicle, !advancePlannedCut(to: MKMapPoint(car)) {
+                if let car = vehicle, !advancePlannedCut(to: MKMapPoint(car), recover: true) {
+                    vehicle = nil
+                } else if let car = vehicle, !leadHoldsPuck(MKMapPoint(car)) {
                     vehicle = nil
                 }
                 let metersPerPoint = MKMetersPerMapPointAtLatitude(coordinates[0].latitude)
@@ -828,10 +901,7 @@ struct LiveFollowMapKitView: UIViewRepresentable {
                 )
                 let count = LiveFollowPlannedAhead.chunkCount(pointCount: plannedPoints.count)
                 for index in plannedFirstFixed..<max(plannedFirstFixed, count) {
-                    let chunk = Array(LiveFollowPlannedAhead.chunk(index, of: plannedPoints))
-                    let line = PlannedRoutePolyline(points: chunk, count: chunk.count)
-                    plannedChunks[index] = line
-                    map.insertOverlay(line, at: 0, level: .aboveRoads)
+                    insertPlannedChunk(index, on: map)
                 }
                 replacePlannedLead(vehicle: vehicle.map { MKMapPoint($0) }, on: map)
             } else {
@@ -848,24 +918,61 @@ struct LiveFollowMapKitView: UIViewRepresentable {
             plannedSegment = 0
             plannedAlong = 0
             plannedFirstFixed = 0
+            plannedDistanceMeters = 0
             lastPlannedLeadAt = 0
             lastPlannedLeadVehicle = nil
+            lastPlannedSample = nil
+        }
+
+        private func plannedOverlays() -> [MKOverlay] {
+            var overlays: [MKOverlay] = Array(plannedChunks.values)
+            if let plannedLead {
+                overlays.append(plannedLead)
+            }
+            return overlays
         }
 
         /// Moves the cut forward to the car. False when the car is off the line.
+        /// `recover` is only for a route that was just loaded, with the cut back at the start.
         @discardableResult
-        private func advancePlannedCut(to vehicle: MKMapPoint) -> Bool {
+        private func advancePlannedCut(to vehicle: MKMapPoint, recover: Bool) -> Bool {
             guard let cut = LiveFollowPlannedAhead.advance(
                 vehicle: vehicle,
                 points: plannedPoints,
                 cumulative: plannedCumulative,
-                fromSegment: plannedSegment
+                fromSegment: plannedSegment,
+                recover: recover,
+                course: session.vehicleHeadingDegrees
             ) else { return false }
+            plannedDistanceMeters = cut.distanceMeters
             if cut.along > plannedAlong {
                 plannedSegment = cut.segment
                 plannedAlong = cut.along
             }
             return true
+        }
+
+        private func leadHoldsPuck(_ vehicle: MKMapPoint) -> Bool {
+            let index = min(max(0, plannedSegment), max(0, plannedPoints.count - 2))
+            let bearing = plannedPoints.count >= 2
+                ? PlannedRouteProgress.bearing(
+                    plannedPoints[index].coordinate,
+                    plannedPoints[index + 1].coordinate
+                )
+                : -1
+            return LiveFollowPlannedAhead.attachesLead(
+                distanceMeters: plannedDistanceMeters,
+                course: session.vehicleHeadingDegrees,
+                routeBearing: bearing
+            )
+        }
+
+        private func insertPlannedChunk(_ index: Int, on map: MKMapView) {
+            let chunk = Array(LiveFollowPlannedAhead.chunk(index, of: plannedPoints))
+            guard chunk.count >= 2 else { return }
+            let line = PlannedRoutePolyline(points: chunk, count: chunk.count)
+            plannedChunks[index] = line
+            map.insertOverlay(line, at: 0, level: .aboveRoads)
         }
 
         /// Follows the car on the tip's 10 Hz gate: drops fixed chunks the car has passed and
@@ -876,13 +983,14 @@ struct LiveFollowMapKitView: UIViewRepresentable {
             guard now - lastPlannedLeadAt >= Self.tipRefreshInterval else { return }
             let point = MKMapPoint(vehicle)
             let metersPerPoint = MKMetersPerMapPointAtLatitude(vehicle.latitude)
-            if let last = lastPlannedLeadVehicle,
+            if let last = lastPlannedSample,
                hypot(point.x - last.x, point.y - last.y) * metersPerPoint < Self.tipRefreshMeters
             {
                 return
             }
             lastPlannedLeadAt = now
-            let onRoute = advancePlannedCut(to: point)
+            lastPlannedSample = point
+            let onRoute = advancePlannedCut(to: point, recover: false)
             let firstFixed = LiveFollowPlannedAhead.firstFixedChunk(
                 along: plannedAlong,
                 cumulative: plannedCumulative,
@@ -895,10 +1003,11 @@ struct LiveFollowMapKitView: UIViewRepresentable {
                     map.removeOverlays(passed)
                 }
             }
-            if onRoute {
+            let holdsPuck = onRoute && leadHoldsPuck(point)
+            if holdsPuck {
                 replacePlannedLead(vehicle: point, on: map)
-            } else if lastPlannedLeadVehicle != nil {
-                // Off the line: the lead stops at the last cut instead of chasing the car.
+            } else if onRoute || lastPlannedLeadVehicle != nil {
+                // Left the road: the line stays on the route. It does not stretch back to the car.
                 replacePlannedLead(vehicle: nil, on: map)
             }
         }

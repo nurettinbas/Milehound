@@ -6,8 +6,12 @@ import CoreGraphics
 /// Close: map fades out; nav puck flies back to the list-card vehicle mark.
 /// Keeps MapKit out of the animation path: callers interpolate cheap rects only.
 enum LiveFollowPresentation {
-    /// Compact HUD height estimate (stats + actions + padding) when intrinsic size is unknown.
-    static let estimatedSettledHUDHeight: CGFloat = 112
+    /// Cluster height estimate (tools, route chip, three stats, actions) when intrinsic size is unknown.
+    static let estimatedSettledHUDHeight: CGFloat = 148
+    /// The cluster stays a compact corner control. It does not grow with the map.
+    static let compactHUDWidthCap: CGFloat = 220
+    static let landscapeCoverHUDWidthCap: CGFloat = compactHUDWidthCap
+    static let paneHUDWidthCap: CGFloat = compactHUDWidthCap
     static let settledBottomPadding: CGFloat = 12
     /// Matches `containerRelativeFrame(..., count: 12, span: 8)`.
     static let settledWidthSpan: CGFloat = 8
@@ -29,6 +33,20 @@ enum LiveFollowPresentation {
             width: lerp(from.width, to.width, t),
             height: lerp(from.height, to.height, t)
         )
+    }
+
+    /// Column width for the live-map cluster. `8/12` of the map, then the cover or pane cap.
+    static func hudColumnWidth(
+        containerWidth: CGFloat,
+        landscapeCover: Bool,
+        fillsPane: Bool
+    ) -> CGFloat {
+        let proportional = min(
+            containerWidth * settledWidthSpan / settledWidthCount,
+            max(0, containerWidth - 32)
+        )
+        let cap = landscapeCover || fillsPane ? compactHUDWidthCap : compactHUDWidthCap
+        return min(proportional, cap)
     }
 
     /// Settled bottom HUD frame inside `container` (same coordinate space).

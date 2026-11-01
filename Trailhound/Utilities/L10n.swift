@@ -78,6 +78,7 @@ enum L10n {
     static var movingDurationHelpTitle: String { string("label.moving_duration.help.title") }
     static var movingDurationHelpBody: String { string("label.moving_duration.help.body") }
     static var currentSpeed: String { string("label.current_speed") }
+    static var liveMapSpeed: String { string("recording.live_map.speed") }
     static var maxAbbr: String { string("label.max_abbr") }
     static var avgAbbr: String { string("label.avg_abbr") }
     static var labelDistance: String { string("label.distance") }
