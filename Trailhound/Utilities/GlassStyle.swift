@@ -662,12 +662,14 @@ struct GlassChromeModifier: ViewModifier {
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.colorSchemeContrast) private var contrast
     @Environment(\.shellPalette) private var shellPalette
+    @Environment(\.glassForcesSolidPlate) private var glassForcesSolidPlate
 
     func body(content: Content) -> some View {
+        let plateFrozen = frozen || glassForcesSolidPlate
         let engine = GlassEngineResolver.resolve(
             scheme: colorScheme,
             reduceTransparency: reduceTransparency,
-            frozen: frozen,
+            frozen: plateFrozen,
             allowsNative: true
         )
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
@@ -682,7 +684,7 @@ struct GlassChromeModifier: ViewModifier {
         } else {
             content
                 .background {
-                    GlassSurface(cornerRadius: cornerRadius, density: .chrome, frozen: frozen)
+                    GlassSurface(cornerRadius: cornerRadius, density: .chrome, frozen: plateFrozen)
                 }
                 .clipShape(shape)
         }

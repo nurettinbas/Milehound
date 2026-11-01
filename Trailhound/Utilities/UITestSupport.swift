@@ -1,3 +1,4 @@
+import CoreLocation
 import Foundation
 import SwiftData
 import UIKit
@@ -52,6 +53,28 @@ enum UITestSupport {
     }
 
     static let odometerCareSeedVehicleID = UUID(uuidString: "aaaaaaaa-0000-4000-8000-000000000024")!
+
+    /// Live-map planned route: a saved place, a fake straight-line route provider, and a
+    /// fixed origin when the simulator has no GPS fix.
+    static var seedsPlannedRoute: Bool {
+        #if DEBUG
+        ProcessInfo.processInfo.arguments.contains("-UITesting.plannedRouteSeed")
+        #else
+        false
+        #endif
+    }
+
+    /// Pretends the car is moving at 15 m/s so destination search locks.
+    static var plannedRouteSpeedOverrideMps: Double? {
+        #if DEBUG
+        ProcessInfo.processInfo.arguments.contains("-UITesting.plannedRouteMoving") ? 15 : nil
+        #else
+        nil
+        #endif
+    }
+
+    static let plannedRouteSeedPlaceID = UUID(uuidString: "aaaaaaaa-0000-4000-8000-0000000000d5")!
+    static let plannedRouteSeedOrigin = CLLocationCoordinate2D(latitude: 41.0082, longitude: 28.9784)
 
     /// Other UI tests tap Start and must not stop on the one-time driving notice.
     static var showsDrivingSafetyNotice: Bool {
@@ -129,7 +152,28 @@ enum UITestSupport {
         if seedsOdometerCare {
             seedOdometerCareFixtures(in: context)
         }
+        if seedsPlannedRoute {
+            seedPlannedRouteFixtures(in: context)
+        }
         try? context.save()
+    }
+
+    @MainActor
+    static func seedPlannedRouteFixtures(in context: ModelContext) {
+        let seedID = plannedRouteSeedPlaceID
+        var existing = FetchDescriptor<SavedPlace>(predicate: #Predicate { $0.id == seedID })
+        existing.fetchLimit = 1
+        if (try? context.fetch(existing).first) != nil { return }
+        context.insert(
+            SavedPlace(
+                id: seedID,
+                name: "Route Seed Office",
+                latitude: 41.0422,
+                longitude: 29.0083,
+                radiusMeters: 200,
+                kind: .work
+            )
+        )
     }
 
     @MainActor

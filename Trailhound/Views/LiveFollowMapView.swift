@@ -1,5 +1,6 @@
 import CoreLocation
 import MapKit
+import SwiftData
 import SwiftUI
 import UIKit
 
@@ -66,6 +67,8 @@ struct LiveFollowMapView: View {
     /// First recorded breadcrumb — kept for the cover's lifetime so the start flag
     /// cannot vanish if the live array is briefly empty.
     @State private var latchedStartCoordinate: CLLocationCoordinate2D?
+    @State private var showsDestinationSheet = false
+    @Environment(\.modelContext) private var modelContext
 
     private var uses3D: Bool { uses3DLocal }
 
@@ -102,7 +105,8 @@ struct LiveFollowMapView: View {
         LiveFollowMapPinBuilder.pins(
             startCoordinate: startPinCoordinate,
             pauseCoordinates: pausePinCoordinates,
-            tripStopCoordinates: tripStopCoordinates
+            tripStopCoordinates: tripStopCoordinates,
+            destinationCoordinate: recordingService.plannedRoute.destination?.coordinate
         )
     }
 
@@ -250,6 +254,31 @@ struct LiveFollowMapView: View {
             session.applyDimensionMode(enabled)
         }
         .accessibilityAddTraits(.isModal)
+        .sheet(isPresented: $showsDestinationSheet) {
+            LiveFollowDestinationSheet(
+                currentDestination: recordingService.plannedRoute.destination,
+                searchCenter: routeOrigin,
+                onPick: { destination in
+                    recordingService.plannedRoute.setDestination(destination, origin: routeOrigin)
+                    showsDestinationSheet = false
+                },
+                onClear: {
+                    recordingService.plannedRoute.clear()
+                    showsDestinationSheet = false
+                },
+                onDismiss: { showsDestinationSheet = false }
+            )
+            .environment(recordingService)
+            .environment(\.trailhoundLayout, layout)
+            .environment(\.shellPalette, shellPalette)
+            .modelContext(modelContext)
+        }
+    }
+
+    /// Where the planned route starts: the live vehicle, else the last fix or breadcrumb.
+    /// UI tests on a simulator without GPS use a fixed seed origin.
+    private var routeOrigin: CLLocationCoordinate2D? {
+        tipCoordinate ?? (UITestSupport.seedsPlannedRoute ? UITestSupport.plannedRouteSeedOrigin : nil)
     }
 
     private func settledChromeStack(
@@ -283,21 +312,28 @@ struct LiveFollowMapView: View {
 
             Spacer(minLength: 0)
 
-            bottomHUD(useGlass: true, tight: landscapeDuoCover)
-                .frame(width: hudWidth, alignment: .leading)
-                .background {
-                    GeometryReader { geo in
-                        let frame = geo.frame(in: .global)
-                        Color.clear
-                            .onAppear { updateHUDAnchor(frame) }
-                            .onChange(of: frame.origin.y) { _, _ in updateHUDAnchor(frame) }
-                            .onChange(of: frame.size.width) { _, _ in updateHUDAnchor(frame) }
-                            .onChange(of: frame.size.height) { _, _ in updateHUDAnchor(frame) }
-                    }
+            VStack(alignment: pinsHUDToLeadingCorner ? .leading : .center, spacing: 8) {
+                LiveFollowRouteChipHost(plannedRoute: recordingService.plannedRoute) {
+                    showsDestinationSheet = true
                 }
-                .frame(maxWidth: .infinity, alignment: pinsHUDToLeadingCorner ? .leading : .center)
-                .padding(.leading, pinsHUDToLeadingCorner ? 12 : 0)
-                .padding(.bottom, hudBottom)
+                .fixedSize(horizontal: true, vertical: true)
+
+                bottomHUD(useGlass: true, tight: landscapeDuoCover)
+                    .frame(width: hudWidth, alignment: .leading)
+            }
+            .background {
+                GeometryReader { geo in
+                    let frame = geo.frame(in: .global)
+                    Color.clear
+                        .onAppear { updateHUDAnchor(frame) }
+                        .onChange(of: frame.origin.y) { _, _ in updateHUDAnchor(frame) }
+                        .onChange(of: frame.size.width) { _, _ in updateHUDAnchor(frame) }
+                        .onChange(of: frame.size.height) { _, _ in updateHUDAnchor(frame) }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: pinsHUDToLeadingCorner ? .leading : .center)
+            .padding(.leading, pinsHUDToLeadingCorner ? 12 : 0)
+            .padding(.bottom, hudBottom)
                 .opacity(chromeReveal)
         }
     }
@@ -389,6 +425,7 @@ struct LiveFollowMapView: View {
         HStack(spacing: 8) {
             if isPaused {
                 pauseStatusChip(font: .caption.weight(.bold), iconSize: 13, horizontal: 8, vertical: 6)
+                    .fixedSize(horizontal: true, vertical: true)
             } else {
                 HStack(spacing: 4) {
                     Image(systemName: "record.circle.fill")
@@ -407,11 +444,16 @@ struct LiveFollowMapView: View {
                 .padding(.horizontal, 8)
                 .padding(.vertical, 6)
                 .glassChrome(cornerRadius: 14)
+                .fixedSize(horizontal: true, vertical: true)
+            }
+
+            if gpsBadgeLeads {
+                gpsBadge
             }
 
             Spacer(minLength: 4)
 
-            if !networkMonitor.isConnected {
+            if !networkMonitor.isConnected, recordingService.plannedRoute.destination == nil {
                 Text(L10n.tripMapOfflineHint)
                     .font(.caption2)
                     .padding(.horizontal, 8)
@@ -421,9 +463,22 @@ struct LiveFollowMapView: View {
                     .minimumScaleFactor(0.75)
             }
 
-            GPSQualityBadge(quality: session.displayedGPSQuality, compact: true)
-                .padding(.trailing, gpsClearance)
+            if !gpsBadgeLeads {
+                gpsBadge
+                    .padding(.trailing, gpsClearance)
+            }
         }
+    }
+
+    /// Phone and iPad: beside the status chip, on the leading edge. The open Duo and the
+    /// closed landscape cover keep it trailing, clear of the corner camera.
+    private var gpsBadgeLeads: Bool {
+        layout.layoutClass != .duoOpen && !landscapeDuoCover
+    }
+
+    private var gpsBadge: some View {
+        GPSQualityBadge(quality: session.displayedGPSQuality)
+            .fixedSize(horizontal: true, vertical: true)
     }
 
     /// The punch-hole sits in the trailing corner, and the map ignores that inset.
@@ -475,6 +530,7 @@ struct LiveFollowMapView: View {
         }
         .buttonStyle(.glassPlainHit)
         .accessibilityLabel(L10n.string("recording.live_map.close"))
+        .accessibilityIdentifier("liveMap.close")
     }
 
     private var mapDimensionToggle: some View {
@@ -1180,6 +1236,42 @@ private struct LiveFollowNavChevron: Shape {
         }
         cg.closeSubpath()
         return Path(cg)
+    }
+}
+
+/// Reads the planned-route store in its own body, so a remaining-distance change re-renders
+/// this chip and not the whole live map.
+struct LiveFollowRouteChipHost: View {
+    var plannedRoute: PlannedRouteStore
+    var action: () -> Void
+
+    var body: some View {
+        TimelineView(.everyMinute) { context in
+            RecordingRouteChip(
+                content: Self.content(for: plannedRoute, now: context.date),
+                action: action
+            )
+        }
+    }
+
+    static func content(for store: PlannedRouteStore, now: Date) -> RecordingRouteChip.Content {
+        guard store.destination != nil else { return .setDestination }
+        switch store.status {
+        case .idle, .loading:
+            return .loading
+        case .offline:
+            return .offline
+        case .failed:
+            return .failed
+        case .ready:
+            guard let meters = store.remainingMeters, let time = store.remainingTravelTime else {
+                return .loading
+            }
+            return .estimate(
+                distance: DateFormatters.formatDistance(meters),
+                arrival: DateFormatters.tripTime.string(from: now.addingTimeInterval(time))
+            )
+        }
     }
 }
 

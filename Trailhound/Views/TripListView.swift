@@ -665,6 +665,19 @@ struct TripListView: View {
         ScrollViewReader { scrollProxy in
             tripListRotationHooks(scrollProxy: scrollProxy)
         }
+        .toolbar(hidesTabBarForLiveMap ? .hidden : .automatic, for: .tabBar)
+        .onChange(of: hidesTabBarForLiveMap, initial: true) { _, hides in
+            TrailhoundTabBarVisibility.shared.hiddenByScreen = hides
+        }
+        .onDisappear {
+            TrailhoundTabBarVisibility.shared.hiddenByScreen = false
+        }
+    }
+
+    /// The phone book is short and the floating tab bar sits across the fold, on top of the
+    /// live map's recording card. Like Apple Maps, the map hides it; closing the map brings it back.
+    private var hidesTabBarForLiveMap: Bool {
+        layout.isPhoneBook && showLiveFollowMap && recordingService.state.isActiveSession && endCredits == nil
     }
 
     private func tripListRoot(scrollProxy: ScrollViewProxy) -> some View {

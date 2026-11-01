@@ -8,6 +8,8 @@ enum LiveFollowMapPinKind: String, Equatable {
     case start
     case pause
     case tripStop
+    /// Planned-route destination. Same red end pin as trip detail.
+    case destination
 }
 
 struct LiveFollowMapPin: Identifiable, Equatable {
@@ -51,7 +53,8 @@ enum LiveFollowMapPinBuilder {
     static func pins(
         startCoordinate: CLLocationCoordinate2D?,
         pauseCoordinates: [CLLocationCoordinate2D],
-        tripStopCoordinates: [CLLocationCoordinate2D]
+        tripStopCoordinates: [CLLocationCoordinate2D],
+        destinationCoordinate: CLLocationCoordinate2D? = nil
     ) -> [LiveFollowMapPin] {
         var result: [LiveFollowMapPin] = []
         if let startCoordinate {
@@ -78,6 +81,15 @@ enum LiveFollowMapPinBuilder {
                     id: "stop-\(index)",
                     kind: .tripStop,
                     coordinate: coordinate
+                )
+            )
+        }
+        if let destinationCoordinate, CLLocationCoordinate2DIsValid(destinationCoordinate) {
+            result.append(
+                LiveFollowMapPin(
+                    id: "destination",
+                    kind: .destination,
+                    coordinate: destinationCoordinate
                 )
             )
         }
@@ -194,9 +206,11 @@ enum LiveFollowGrowingRoute {
 
     /// Tight box around the traveled path and the puck. A short axis grows to
     /// `overviewMinPadMeters`; a long drive is not padded by a fraction of itself.
+    /// With a planned route, the destination joins the box so the whole drive ahead shows too.
     static func overviewMapRect(
         historyPieces: [[CLLocationCoordinate2D]],
-        vehicle: CLLocationCoordinate2D?
+        vehicle: CLLocationCoordinate2D?,
+        destination: CLLocationCoordinate2D? = nil
     ) -> MKMapRect {
         var rect = MKMapRect.null
         func include(_ coordinate: CLLocationCoordinate2D) {
@@ -210,6 +224,9 @@ enum LiveFollowGrowingRoute {
         }
         if let vehicle {
             include(vehicle)
+        }
+        if let destination, CLLocationCoordinate2DIsValid(destination) {
+            include(destination)
         }
         guard !rect.isNull else { return .null }
         let latitude = MKMapPoint(x: rect.midX, y: rect.midY).coordinate.latitude

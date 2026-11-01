@@ -48,6 +48,15 @@ enum TrailhoundTabBarTheme {
     ]
 }
 
+/// A screen that hid the tab bar with `.toolbar(.hidden, for: .tabBar)` sets this, so the
+/// installer below does not force the bar back on.
+@MainActor
+@Observable
+final class TrailhoundTabBarVisibility {
+    static let shared = TrailhoundTabBarVisibility()
+    var hiddenByScreen = false
+}
+
 /// System iOS 26 `UITabBar`. Light and Dark keep the system Liquid Glass platter.
 /// The selection capsule and its icon use the palette tint — iOS otherwise paints
 /// that capsule with `AccentColor` (blue) on every theme. Do not copy
@@ -58,8 +67,10 @@ enum TrailhoundTabBarCompact {
         @MainActor static var key: UInt8 = 0
     }
     static func apply(to tabBar: UITabBar, palette: ShellPalette, scheme: ColorScheme) {
-        tabBar.isHidden = false
-        tabBar.alpha = 1
+        if !TrailhoundTabBarVisibility.shared.hiddenByScreen {
+            tabBar.isHidden = false
+            tabBar.alpha = 1
+        }
         restoreSystemWidthIfNeeded(tabBar)
         clearInterfaceStylePin(tabBar)
         clearItemInterfaceStylePins(in: tabBar)

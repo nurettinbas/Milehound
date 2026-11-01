@@ -86,6 +86,100 @@ extension View {
     }
 }
 
+/// Live-map top chip for the planned route. Same `glassChrome(cornerRadius: 14)` capsule and
+/// caption ink as the recording status chip; the whole chip is the button.
+/// No destination: "Destination". Otherwise remaining distance and estimated arrival, or the route state.
+struct RecordingRouteChip: View {
+    enum Content: Equatable {
+        case setDestination
+        case loading
+        case offline
+        case failed
+        case estimate(distance: String, arrival: String)
+    }
+
+    let content: Content
+    let action: () -> Void
+
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        Button {
+            TrailhoundHaptics.selection()
+            action()
+        } label: {
+            HStack(spacing: 4) {
+                leading
+                Text(title)
+                    .font(.caption.weight(.bold))
+                    .monospacedDigit()
+                    .foregroundStyle(GlassText.primary(for: colorScheme))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .glassChrome(cornerRadius: 14)
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.glassPlainHit)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(accessibilityText)
+        .accessibilityHint(
+            content == .setDestination ? "" : L10n.string("recording.live_map.destination.change")
+        )
+        .accessibilityAddTraits(.isButton)
+        .accessibilityIdentifier(content == .setDestination ? "liveMap.destination" : "liveMap.eta")
+    }
+
+    @ViewBuilder
+    private var leading: some View {
+        switch content {
+        case .setDestination:
+            Image(systemName: "flag.fill")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(GlassText.primary(for: colorScheme))
+        case .loading:
+            ProgressView()
+                .controlSize(.mini)
+        case .offline:
+            Image(systemName: "wifi.slash")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(GlassText.primary(for: colorScheme))
+        case .failed:
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(GlassSemantic.paused(for: colorScheme))
+        case .estimate:
+            Image(systemName: "flag.checkered")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(GlassText.primary(for: colorScheme))
+        }
+    }
+
+    private var title: String {
+        switch content {
+        case .setDestination:
+            return L10n.string("recording.live_map.destination")
+        case .loading:
+            return L10n.string("recording.live_map.route.loading")
+        case .offline:
+            return L10n.string("recording.live_map.route.offline")
+        case .failed:
+            return L10n.string("recording.live_map.route.failed")
+        case let .estimate(distance, arrival):
+            return String(format: L10n.string("recording.live_map.route.eta"), distance, arrival)
+        }
+    }
+
+    private var accessibilityText: String {
+        if case let .estimate(distance, arrival) = content {
+            return String(format: L10n.string("recording.live_map.route.eta.accessibility"), distance, arrival)
+        }
+        return title
+    }
+}
+
 private struct RecordingSegmentTrackModifier: ViewModifier {
     @Environment(\.colorScheme) private var colorScheme
 

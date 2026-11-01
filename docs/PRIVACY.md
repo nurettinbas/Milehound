@@ -16,6 +16,10 @@ This page is the public privacy policy for the App Store listing and the in-app 
 
 Location is used for recording drives (app functionality). It is not sent to Trailhound unless you explicitly mail a diagnostic report, and that report does **not** include coordinates, addresses, place names, vehicle names, photos, or your notes.
 
+## Maps and directions (Apple MapKit)
+
+Map tiles, place search, street names for trip ends, and the **planned route** on the live map come from Apple’s MapKit. When you pick a destination on the live map, the app sends your current position and that destination to Apple to get driving directions; when you type a place search, the text and the map area go to Apple. These requests go straight from your iPhone to Apple under [Apple’s privacy policy](https://www.apple.com/legal/privacy/). Trailhound has no server in between, receives none of it, and does not save the destination or the planned route — they are held in memory only while that recording runs and are cleared when it ends.
+
 ## Report a problem (optional)
 
 Settings → **Report a problem** is infrequent and optional. Each time, Trailhound shows what the attachment contains and waits for you to continue. Nothing leaves the device until you send the system Mail message (or share the file yourself).
@@ -79,6 +83,6 @@ Trailhound is a driving log and is not directed at children. It does not knowing
 
 If this policy changes, the new version is published at this address with an updated date.
 
-_Last updated: 29 October 2026_
+_Last updated: 1 November 2026_
 
 See also [Support](SUPPORT.md) and [Acknowledgements](ACKNOWLEDGEMENTS.md).

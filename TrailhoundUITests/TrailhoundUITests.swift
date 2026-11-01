@@ -760,3 +760,133 @@ final class PadLayoutUITests: TrailhoundUITestCase {
         try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .pad, "iPad layout")
     }
 }
+
+/// Live-map planned route: pick a saved place, see remaining distance + arrival, remove it.
+/// `-UITesting.plannedRouteSeed` swaps MapKit for a straight-line provider and seeds "Route Seed Office".
+class LiveMapPlannedRouteUITestCase: TrailhoundUITestCase {
+    override var extraLaunchArguments: [String] { ["-UITesting.plannedRouteSeed"] }
+
+    let seedPlaceIdentifier = "destinationSheet.place.AAAAAAAA-0000-4000-8000-0000000000D5"
+
+    func element(_ identifier: String) -> XCUIElement {
+        app.descendants(matching: .any).matching(identifier: identifier).firstMatch
+    }
+
+    func openLiveMap() throws {
+        XCTAssertTrue(tripsTab.waitForExistence(timeout: uiTimeout))
+        let starts = app.buttons.matching(identifier: "shell.start")
+        let start = starts.allElementsBoundByIndex.first { $0.isHittable } ?? starts.firstMatch
+        XCTAssertTrue(start.waitForExistence(timeout: uiTimeout))
+        start.tap()
+        guard element("recording.live_map.open").waitForExistence(timeout: uiTimeout) else {
+            throw XCTSkip("Recording did not start on this simulator (no location authorization).")
+        }
+        liveMapOpenButton().tap()
+        XCTAssertTrue(element("liveMap.destination").waitForExistence(timeout: uiTimeout))
+    }
+
+    /// The recording card shares the identifier; the map glyph is the smallest match.
+    func liveMapOpenButton() -> XCUIElement {
+        let matches = app.buttons.matching(identifier: "recording.live_map.open").allElementsBoundByIndex
+        return matches.min { $0.frame.width * $0.frame.height < $1.frame.width * $1.frame.height }
+            ?? element("recording.live_map.open")
+    }
+
+    func stopRecording() {
+        let close = element("liveMap.close")
+        if close.waitForExistence(timeout: 5) {
+            close.tap()
+        }
+        let stop = app.buttons["Stop"].firstMatch
+        if stop.waitForExistence(timeout: uiTimeout) {
+            stop.tap()
+        }
+    }
+}
+
+final class LiveMapPlannedRouteUITests: LiveMapPlannedRouteUITestCase {
+    func testLiveMapPlannedRouteShowsEtaAndClears() throws {
+        try openLiveMap()
+        element("liveMap.destination").tap()
+
+        let place = element(seedPlaceIdentifier)
+        XCTAssertTrue(place.waitForExistence(timeout: uiTimeout))
+        XCTAssertTrue(element("destinationSheet.search").exists, "Stopped car: search is open")
+        place.tap()
+
+        let eta = element("liveMap.eta")
+        XCTAssertTrue(eta.waitForExistence(timeout: uiTimeout))
+        eta.tap()
+
+        let clear = element("liveMap.destination.clear")
+        XCTAssertTrue(clear.waitForExistence(timeout: uiTimeout))
+        clear.tap()
+        XCTAssertTrue(element("liveMap.destination").waitForExistence(timeout: uiTimeout))
+        XCTAssertFalse(eta.exists)
+
+        stopRecording()
+    }
+
+    func testDestinationSurvivesClosingTheLiveMap() throws {
+        try openLiveMap()
+        element("liveMap.destination").tap()
+        let place = element(seedPlaceIdentifier)
+        XCTAssertTrue(place.waitForExistence(timeout: uiTimeout))
+        place.tap()
+        XCTAssertTrue(element("liveMap.eta").waitForExistence(timeout: uiTimeout))
+
+        element("liveMap.close").tap()
+        XCTAssertTrue(element("recording.live_map.open").waitForExistence(timeout: uiTimeout))
+        liveMapOpenButton().tap()
+        XCTAssertTrue(element("liveMap.eta").waitForExistence(timeout: uiTimeout))
+
+        stopRecording()
+    }
+}
+
+final class LiveMapPlannedRouteMovingUITests: LiveMapPlannedRouteUITestCase {
+    override var extraLaunchArguments: [String] { ["-UITesting.plannedRouteSeed", "-UITesting.plannedRouteMoving"] }
+
+    func testSearchLocksWhileMovingButSavedPlacesStayOneTap() throws {
+        try openLiveMap()
+        element("liveMap.destination").tap()
+
+        XCTAssertTrue(element("destinationSheet.search.locked").waitForExistence(timeout: uiTimeout))
+        XCTAssertFalse(element("destinationSheet.search").exists)
+        let place = element(seedPlaceIdentifier)
+        XCTAssertTrue(place.waitForExistence(timeout: uiTimeout))
+        place.tap()
+        XCTAssertTrue(element("liveMap.eta").waitForExistence(timeout: uiTimeout))
+
+        stopRecording()
+    }
+}
+
+final class LiveMapPlannedRoutePadUITests: LiveMapPlannedRouteUITestCase {
+    /// The runner can report a phone idiom on an iPad simulator; the app window cannot lie.
+    private var isPad: Bool {
+        let frame = app.windows.firstMatch.frame
+        return min(frame.width, frame.height) >= 744
+    }
+
+    func testPadDestinationFormPicksAndCloses() throws {
+        XCTAssertTrue(tripsTab.waitForExistence(timeout: uiTimeout))
+        try XCTSkipUnless(isPad, "iPad layout")
+        XCUIDevice.shared.orientation = .landscapeLeft
+        try openLiveMap()
+        element("liveMap.destination").tap()
+
+        let close = element("destinationSheet.close")
+        XCTAssertTrue(close.waitForExistence(timeout: uiTimeout))
+        close.tap()
+        XCTAssertTrue(close.waitForNonExistence(timeout: uiTimeout))
+
+        element("liveMap.destination").tap()
+        let place = element(seedPlaceIdentifier)
+        XCTAssertTrue(place.waitForExistence(timeout: uiTimeout))
+        place.tap()
+        XCTAssertTrue(element("liveMap.eta").waitForExistence(timeout: uiTimeout))
+
+        stopRecording()
+    }
+}
