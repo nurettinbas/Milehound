@@ -2606,6 +2606,29 @@ private struct GlassCollapsingPlateModifier: ViewModifier {
     }
 }
 
+extension View {
+    /// Marks the control a sheet zooms out of. Pair with `.glassSheetZoom(from:in:)` on the sheet.
+    @ViewBuilder
+    func glassSheetZoomSource(id: some Hashable, in namespace: Namespace.ID) -> some View {
+        if #available(iOS 18.0, *) {
+            matchedTransitionSource(id: id, in: namespace)
+        } else {
+            self
+        }
+    }
+
+    /// The sheet grows out of its source control and shrinks back into it on dismiss, including
+    /// the interactive swipe. iOS 17 keeps the system slide-up.
+    @ViewBuilder
+    func glassSheetZoom(from id: some Hashable, in namespace: Namespace.ID) -> some View {
+        if #available(iOS 18.0, *) {
+            navigationTransition(.zoom(sourceID: id, in: namespace))
+        } else {
+            self
+        }
+    }
+}
+
 private struct GlassCarouselPageModifier: ViewModifier {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 

@@ -75,6 +75,8 @@ struct LiveFollowDestinationSheet: View {
 
     private let geocodingService = GeocodingService()
 
+    static let zoomID = "liveMap.destination"
+
     /// Open Duo and iPad get a centered form; phones keep the bottom sheet.
     static func usesFormSizing(_ layout: TrailhoundLayoutSnapshot) -> Bool {
         switch layout.layoutClass {

@@ -68,6 +68,7 @@ struct LiveFollowMapView: View {
     /// cannot vanish if the live array is briefly empty.
     @State private var latchedStartCoordinate: CLLocationCoordinate2D?
     @State private var showsDestinationSheet = false
+    @Namespace private var destinationZoom
     @Environment(\.modelContext) private var modelContext
 
     private var uses3D: Bool { uses3DLocal }
@@ -260,18 +261,27 @@ struct LiveFollowMapView: View {
                 searchCenter: routeOrigin,
                 onPick: { destination in
                     recordingService.plannedRoute.setDestination(destination, origin: routeOrigin)
-                    showsDestinationSheet = false
+                    setDestinationSheet(false)
                 },
                 onClear: {
                     recordingService.plannedRoute.clear()
-                    showsDestinationSheet = false
+                    setDestinationSheet(false)
                 },
-                onDismiss: { showsDestinationSheet = false }
+                onDismiss: { setDestinationSheet(false) }
             )
             .environment(recordingService)
             .environment(\.trailhoundLayout, layout)
             .environment(\.shellPalette, shellPalette)
             .modelContext(modelContext)
+            .glassSheetZoom(from: LiveFollowDestinationSheet.zoomID, in: destinationZoom)
+        }
+    }
+
+    private func setDestinationSheet(_ shown: Bool) {
+        var transaction = Transaction()
+        transaction[LiveFollowSheetTransition.self] = true
+        withTransaction(transaction) {
+            showsDestinationSheet = shown
         }
     }
 
@@ -314,9 +324,10 @@ struct LiveFollowMapView: View {
 
             VStack(alignment: pinsHUDToLeadingCorner ? .leading : .center, spacing: 8) {
                 LiveFollowRouteChipHost(plannedRoute: recordingService.plannedRoute) {
-                    showsDestinationSheet = true
+                    setDestinationSheet(true)
                 }
                 .fixedSize(horizontal: true, vertical: true)
+                .glassSheetZoomSource(id: LiveFollowDestinationSheet.zoomID, in: destinationZoom)
 
                 bottomHUD(useGlass: true, tight: landscapeDuoCover)
                     .frame(width: hudWidth, alignment: .leading)
@@ -1237,6 +1248,12 @@ private struct LiveFollowNavChevron: Shape {
         cg.closeSubpath()
         return Path(cg)
     }
+}
+
+/// Marks the destination sheet's present and dismiss. The live map cover turns animations off
+/// for everything else, which would make the sheet pop in instead of zooming out of the chip.
+struct LiveFollowSheetTransition: TransactionKey {
+    static let defaultValue = false
 }
 
 /// Reads the planned-route store in its own body, so a remaining-distance change re-renders

@@ -1684,7 +1684,11 @@ struct TripListView: View {
                     }
                 )
                 .presentationBackground(.clear)
-                .transaction { $0.disablesAnimations = true }
+                .transaction { transaction in
+                    if !transaction[LiveFollowSheetTransition.self] {
+                        transaction.disablesAnimations = true
+                    }
+                }
                 .environment(recordingService)
                 .environment(AppServices.runtime.locationService)
                 .environment(NetworkMonitor.shared)
