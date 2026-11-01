@@ -135,6 +135,11 @@ enum GlassTokens {
         }
         return Color.white.opacity(0.72)
     }
+
+    /// Palette tint for the live-map HUD Liquid Glass. Light enough that HUD ink keeps its contrast over the road.
+    static func liveMapGlassTint(for scheme: ColorScheme, palette: ShellPalette) -> Color {
+        palette.tintColor(for: scheme).opacity(scheme == .dark ? 0.22 : 0.14)
+    }
 }
 
 enum GlassDensity {

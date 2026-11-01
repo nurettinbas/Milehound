@@ -44,9 +44,9 @@ struct LiveFollowDestinationOption: Identifiable, Equatable {
         )
     }
 
-    init(result: NearbyPlaceOption) {
+    init(result: NearbyPlaceOption, idPrefix: String = "search") {
         self.init(
-            id: "search.\(result.id)",
+            id: "\(idPrefix).\(result.id)",
             name: result.name,
             subtitle: result.subtitle,
             systemImage: "mappin.and.ellipse",
@@ -71,10 +71,13 @@ struct LiveFollowDestinationSheet: View {
     @State private var results: [LiveFollowDestinationOption] = []
     @State private var isSearching = false
     @State private var searchTask: Task<Void, Never>?
+    @State private var nearbyPlaces: [LiveFollowDestinationOption] = []
 
     private let geocodingService = GeocodingService()
 
     static let zoomID = "liveMap.destination"
+    static let nearbySuggestionLimit = 4
+    static let nearbySuggestionRadius: CLLocationDistance = 1_500
 
     /// Open Duo and iPad get a centered form; phones keep the bottom sheet.
     static func usesFormSizing(_ layout: TrailhoundLayoutSnapshot) -> Bool {
@@ -104,6 +107,7 @@ struct LiveFollowDestinationSheet: View {
             ),
             results: results,
             isSearching: isSearching,
+            nearbyPlaces: nearbyPlaces,
             onPick: { option in
                 onPick(option.destination)
             },
@@ -111,6 +115,9 @@ struct LiveFollowDestinationSheet: View {
             onDismiss: onDismiss
         )
         .modifier(LiveFollowDestinationPresentation(formSizing: Self.usesFormSizing(layout)))
+        .task(id: allowsSearch) {
+            await loadNearbyPlaces()
+        }
         .onChange(of: query) { _, _ in
             scheduleSearch()
         }
@@ -143,9 +150,21 @@ struct LiveFollowDestinationSheet: View {
                 )
             }
             guard !Task.isCancelled else { return }
-            results = found.map(LiveFollowDestinationOption.init(result:))
+            results = found.map { LiveFollowDestinationOption(result: $0) }
             isSearching = false
         }
+    }
+
+    private func loadNearbyPlaces() async {
+        guard allowsSearch, nearbyPlaces.isEmpty, let center = searchCenter else { return }
+        let found = await geocodingService.nearbyPointsOfInterest(
+            around: center,
+            radius: Self.nearbySuggestionRadius
+        )
+        guard !Task.isCancelled else { return }
+        nearbyPlaces = found
+            .prefix(Self.nearbySuggestionLimit)
+            .map { LiveFollowDestinationOption(result: $0, idPrefix: "nearby") }
     }
 
     private func cancelSearch() {
@@ -164,6 +183,7 @@ struct LiveFollowDestinationSheetContent: View {
     @Binding var query: String
     var results: [LiveFollowDestinationOption]
     var isSearching: Bool
+    var nearbyPlaces: [LiveFollowDestinationOption] = []
     var onPick: (LiveFollowDestinationOption) -> Void
     var onClear: () -> Void
     var onDismiss: () -> Void
@@ -180,6 +200,9 @@ struct LiveFollowDestinationSheetContent: View {
                 }
                 savedSection
                 searchSection
+                if showsNearby {
+                    nearbySection
+                }
             }
             .padding(.horizontal, 20)
             .padding(.top, 18)
@@ -295,6 +318,19 @@ struct LiveFollowDestinationSheetContent: View {
                 )
                 .accessibilityIdentifier("destinationSheet.search.locked")
             }
+        }
+    }
+
+    private var showsNearby: Bool {
+        allowsSearch
+            && !nearbyPlaces.isEmpty
+            && query.trimmingCharacters(in: .whitespacesAndNewlines).count < 2
+    }
+
+    private var nearbySection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            sectionTitle(L10n.string("recording.live_map.destination.sheet.nearby"))
+            optionList(nearbyPlaces, identifierPrefix: "destinationSheet.nearby")
         }
     }
 

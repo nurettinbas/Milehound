@@ -14390,6 +14390,23 @@
         }
       }
     },
+    "recording.live_map.destination.sheet.nearby" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nearby places"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Yakındaki yerler"
+          }
+        }
+      }
+    },
     "recording.live_map.destination.sheet.search" : {
       "extractionState" : "manual",
       "localizations" : {

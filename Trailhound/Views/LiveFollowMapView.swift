@@ -1102,8 +1102,8 @@ struct LiveFollowRouteCard: View {
                     .padding(.top, 6)
                     .padding(.bottom, 8)
             }
-            .background { LiveMapHUDPlate(shape: shape) }
             .clipShape(shape)
+            .liveMapHUDPlate(shape)
         }
     }
 

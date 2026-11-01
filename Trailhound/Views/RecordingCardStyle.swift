@@ -42,7 +42,7 @@ enum RecordingCardStyle {
 
 /// 2D/3D and overview/follow on the live-map HUD.
 ///
-/// The plates are pale frozen frost, so the selected segment can carry the palette
+/// The plates are pale palette glass, so the selected segment can carry the palette
 /// tint. Its label is whichever of white or the light chrome ink contrasts with that tint.
 /// Unselected labels use the plate’s secondary ink.
 enum RecordingSegmentChrome {
@@ -112,8 +112,9 @@ enum LiveFollowHUDInk {
     }
 }
 
-/// Compact map plate. Material lets the road show through. No live `glassEffect`.
-/// Snapshots force the frozen frost so the blur does not change between runtimes.
+/// Compact map plate behind HUD content. iOS 26 live glass goes through `.liveMapHUDPlate(_:)`
+/// instead, because a `glassEffect` on a background view draws over the labels inside a grouping.
+/// Snapshots force the frozen frost so the glass does not change between runtimes.
 struct LiveMapHUDPlate<ControlShape: InsettableShape>: View {
     let shape: ControlShape
 
@@ -139,8 +140,36 @@ struct LiveMapHUDPlate<ControlShape: InsettableShape>: View {
     }
 }
 
+/// iOS 26: palette-tinted Liquid Glass on the content itself, so labels stay on top of the glass.
+/// Only inside `LiveFollowHUD`, whose `glassEffectGrouping` renders every plate as one glass host.
+private struct LiveMapHUDPlateModifier<ControlShape: InsettableShape>: ViewModifier {
+    let shape: ControlShape
+    var interactive: Bool
+
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.shellPalette) private var shellPalette
+    @Environment(\.glassForcesSolidPlate) private var glassForcesSolidPlate
+
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *), !reduceTransparency, !glassForcesSolidPlate {
+            let glass = Glass.regular.tint(
+                GlassTokens.liveMapGlassTint(for: colorScheme, palette: shellPalette)
+            )
+            content.glassEffect(interactive ? glass.interactive() : glass, in: shape)
+        } else {
+            content.background { LiveMapHUDPlate(shape: shape) }
+        }
+    }
+}
+
 extension View {
-    /// Frost track for a two-option control on the recording HUD. No `glassEffect`.
+    /// Live-map HUD plate. `interactive` adds press feedback for plates that are themselves the button.
+    func liveMapHUDPlate<S: InsettableShape>(_ shape: S, interactive: Bool = false) -> some View {
+        modifier(LiveMapHUDPlateModifier(shape: shape, interactive: interactive))
+    }
+
+    /// `LiveMapHUDPlate` track for a two-option control on the recording HUD.
     func recordingSegmentTrack() -> some View {
         modifier(RecordingSegmentTrackModifier())
     }
@@ -219,13 +248,7 @@ struct RecordingRouteChip: View {
             .padding(.horizontal, wide ? 12 : 8)
             .padding(.vertical, embedded ? 7 : (wide ? 5 : 3))
             .frame(maxWidth: wide ? .infinity : nil)
-            .background {
-                if embedded {
-                    TrailhoundTintCapsule()
-                } else {
-                    LiveMapHUDPlate(shape: Capsule())
-                }
-            }
+            .chipPlate(embedded: embedded)
             .contentShape(AnyShape(Capsule()))
         }
         .buttonStyle(.glassPlainHit)
@@ -287,14 +310,24 @@ struct RecordingRouteChip: View {
     }
 }
 
+private extension View {
+    /// Embedded in the route card: theme capsule. Standalone: the HUD glass capsule is the button.
+    @ViewBuilder
+    func chipPlate(embedded: Bool) -> some View {
+        if embedded {
+            background { TrailhoundTintCapsule() }
+        } else {
+            liveMapHUDPlate(Capsule(), interactive: true)
+        }
+    }
+}
+
 private struct RecordingSegmentTrackModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .padding(2)
             .frame(height: 28)
-            .background {
-                LiveMapHUDPlate(shape: Capsule())
-            }
+            .liveMapHUDPlate(Capsule())
     }
 }
 
@@ -381,7 +414,7 @@ struct LiveFollowHUDSample: Equatable {
 }
 
 /// Live-map cluster: tool capsules, route chip, three stat plates, Pause and Stop.
-/// Plates are frozen map frost. Pass `stats` in snapshots; nil reads the recording service.
+/// Plates are `LiveMapHUDPlate` glass in one grouping. Pass `stats` in snapshots; nil reads the recording service.
 struct LiveFollowHUD<Route: View>: View {
     var tight: Bool
     var isPaused: Bool
@@ -409,6 +442,7 @@ struct LiveFollowHUD<Route: View>: View {
                 .fixedSize(horizontal: true, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .glassEffectGrouping(spacing: 0)
     }
 
     @ViewBuilder
@@ -540,7 +574,7 @@ struct LiveFollowHUD<Route: View>: View {
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 5)
-            .background { LiveMapHUDPlate(shape: columnShape) }
+            .liveMapHUDPlate(columnShape, interactive: true)
             .contentShape(columnShape)
         }
         .buttonStyle(.glassPlainHit)
@@ -656,9 +690,7 @@ private struct LiveFollowHUDStat: View {
         .fixedSize(horizontal: true, vertical: true)
         .padding(.horizontal, 6)
         .padding(.vertical, 3)
-        .background {
-            LiveMapHUDPlate(shape: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        }
+        .liveMapHUDPlate(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 }
 
