@@ -150,8 +150,8 @@ enum LiveFollowPresentation {
 
     /// Artwork is drawn pointing screen-up. Rotate it by this many radians so the
     /// chevron's sharp tip (and the photo) face `travelHeading` on a map whose
-    /// camera heading is `mapHeading`. Zero while following — the camera already
-    /// faces travel, so the unrotated puck is already correct.
+    /// camera heading is `mapHeading`. Near zero while following on a straight; through a
+    /// turn the eased camera trails the vehicle and the chevron leads by the gap.
     static func puckRotationRadians(
         travelHeadingDegrees: Double,
         mapHeadingDegrees: Double

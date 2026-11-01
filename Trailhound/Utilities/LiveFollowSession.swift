@@ -52,6 +52,7 @@ final class LiveFollowSession {
 
     var vehicleCoordinate: CLLocationCoordinate2D? { camera.center }
     var pose: LiveFollowCamera.Pose? { camera.pose }
+    var vehicleHeadingDegrees: CLLocationDirection { camera.vehicleHeadingDegrees }
 
     func ingest(location: CLLocation, isPaused: Bool, now: Date = Date()) {
         camera.ingest(location: location, isPaused: isPaused, now: now)

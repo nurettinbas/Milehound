@@ -20,13 +20,14 @@ final class LiveFollowCameraTests: XCTestCase {
         XCTAssertEqual(camera.headingDegrees, 90, accuracy: 0.01)
     }
 
-    func testBadCourseAccuracyHoldsHeading() {
+    func testBadCourseAccuracyFollowsPathBearing() {
         var camera = LiveFollowCamera()
         let good = location(lat: 41.0, lon: 29.0, speedMps: 20, course: 45, courseAccuracy: 8)
         camera.ingest(location: good, isPaused: false, now: baseDate)
         _ = camera.tick(dt: frame, now: baseDate)
         XCTAssertEqual(camera.headingDegrees, 45, accuracy: 0.01)
 
+        // 22 m due north with an untrusted course: the path is the only honest heading.
         let badCourse = location(
             lat: 41.0002,
             lon: 29.0,
@@ -36,8 +37,110 @@ final class LiveFollowCameraTests: XCTestCase {
         )
         let later = baseDate.addingTimeInterval(1)
         camera.ingest(location: badCourse, isPaused: false, now: later)
-        _ = camera.tick(dt: frame, now: later)
+        XCTAssertEqual(camera.vehicleHeadingDegrees, 45, accuracy: 0.01)
+        var now = later
+        for _ in 0..<60 {
+            now = now.addingTimeInterval(frame)
+            _ = camera.tick(dt: frame, now: now)
+        }
+        XCTAssertLessThan(camera.vehicleHeadingDegrees, 5)
+        XCTAssertLessThan(camera.headingDegrees, 45)
+    }
+
+    func testBadCourseWithTinyMoveHoldsHeading() {
+        var camera = LiveFollowCamera()
+        let good = location(lat: 41.0, lon: 29.0, speedMps: 20, course: 45, courseAccuracy: 8)
+        camera.ingest(location: good, isPaused: false, now: baseDate)
+        _ = camera.tick(dt: frame, now: baseDate)
+
+        // ~1 m of jitter is not a direction of travel.
+        let jitter = location(
+            lat: 41.00001,
+            lon: 29.0,
+            speedMps: 20,
+            course: -1,
+            courseAccuracy: -1,
+            timestamp: baseDate.addingTimeInterval(1)
+        )
+        camera.ingest(location: jitter, isPaused: false, now: baseDate.addingTimeInterval(1))
+        _ = camera.tick(dt: frame, now: baseDate.addingTimeInterval(1))
         XCTAssertEqual(camera.headingDegrees, 45, accuracy: 0.01)
+    }
+
+    /// Simulator and urban GPS often omit `course`. The puck used to keep the first heading
+    /// forever and dead-reckon straight off the road after the first turn.
+    func testRightAngleTurnWithoutCourseStaysOnTrail() {
+        var camera = LiveFollowCamera()
+        let speed = 11.0
+        let stepDegrees = speed / 111_320.0
+        var fixes: [CLLocationCoordinate2D] = (0..<8).map {
+            CLLocationCoordinate2D(latitude: 41.0 + Double($0) * stepDegrees, longitude: 29.0)
+        }
+        let corner = fixes.last!
+        let lonStep = speed / (111_320.0 * cos(41.0 * .pi / 180))
+        fixes += (1...12).map {
+            CLLocationCoordinate2D(latitude: corner.latitude, longitude: corner.longitude - Double($0) * lonStep)
+        }
+
+        var now = baseDate
+        var worstAfterTurn = 0.0
+        for (index, fix) in fixes.enumerated() {
+            let stamp = baseDate.addingTimeInterval(Double(index))
+            let sample = CLLocation(
+                coordinate: fix,
+                altitude: 0,
+                horizontalAccuracy: 5,
+                verticalAccuracy: 5,
+                course: -1,
+                courseAccuracy: -1,
+                speed: speed,
+                speedAccuracy: -1,
+                timestamp: stamp
+            )
+            for _ in 0..<60 {
+                camera.ingest(location: sample, isPaused: false, now: now)
+                _ = camera.tick(dt: frame, now: now)
+                now = now.addingTimeInterval(frame)
+            }
+            if index >= 11, let center = camera.center {
+                // West leg: distance from the road (constant latitude) in metres.
+                worstAfterTurn = max(worstAfterTurn, abs(center.latitude - corner.latitude) * 111_320)
+            }
+        }
+        XCTAssertLessThan(worstAfterTurn, 3, "puck must settle back onto the new road")
+        XCTAssertEqual(camera.vehicleHeadingDegrees, 270, accuracy: 10)
+    }
+
+    func testWrongHeadingCannotRunAwayFromGPS() {
+        var camera = LiveFollowCamera()
+        camera.ingest(
+            location: location(lat: 41.0, lon: 29.0, speedMps: 11, course: 0, courseAccuracy: 5),
+            isPaused: false,
+            now: baseDate
+        )
+        // Fixes keep landing on the start point while the stale heading says north.
+        var now = baseDate
+        for second in 1...10 {
+            let stamp = baseDate.addingTimeInterval(Double(second))
+            let still = location(
+                lat: 41.0,
+                lon: 29.0,
+                speedMps: 11,
+                course: -1,
+                courseAccuracy: -1,
+                timestamp: stamp
+            )
+            for _ in 0..<60 {
+                camera.ingest(location: still, isPaused: false, now: now)
+                _ = camera.tick(dt: frame, now: now)
+                now = now.addingTimeInterval(frame)
+            }
+        }
+        let drift = CLLocation(latitude: 41.0, longitude: 29.0).distance(from: CLLocation(
+            latitude: camera.center?.latitude ?? 0,
+            longitude: camera.center?.longitude ?? 0
+        ))
+        XCTAssertLessThan(drift, 20)
     }
 
     func testPauseFreezesCameraUpdates() {
@@ -474,7 +577,7 @@ final class LiveFollowCameraTests: XCTestCase {
         XCTAssertEqual(camera.center?.latitude ?? -1, 41.02, accuracy: 0.0001)
     }
 
-    func testNegativeCourseHoldsHeading() {
+    func testNegativeCourseKeepsPuckBetweenFixes() {
         var camera = LiveFollowCamera()
         let good = location(lat: 41.0, lon: 29.0, speedMps: 20, course: 45, courseAccuracy: 5)
         camera.ingest(location: good, isPaused: false, now: baseDate)
@@ -490,7 +593,8 @@ final class LiveFollowCameraTests: XCTestCase {
         let later = baseDate.addingTimeInterval(1)
         camera.ingest(location: unavailable, isPaused: false, now: later)
         _ = camera.tick(dt: frame, now: later)
-        XCTAssertEqual(camera.headingDegrees, 45, accuracy: 0.01)
+        XCTAssertLessThanOrEqual(camera.headingDegrees, 45)
+        XCTAssertGreaterThan(camera.headingDegrees, 40, "camera eases toward the path, no lunge")
         let lat = camera.center?.latitude ?? -1
         XCTAssertGreaterThan(lat, 41.0)
         XCTAssertLessThanOrEqual(lat, 41.0002)

@@ -36,6 +36,19 @@ struct LiveFollowCamera {
     static let alongCatchupTauSeconds: TimeInterval = 1.20
     /// Ignore sub-step along-track noise, but small enough that real lag cannot settle in.
     static let alongCatchupDeadbandMeters: CLLocationDistance = 0.25
+    /// Puck ahead of the projected fix brakes on this time constant (capped at the frame step).
+    static let aheadBrakeTauSeconds: TimeInterval = 0.35
+    /// Direction the puck actually moves in. Much tighter than the camera heading so the
+    /// puck turns with the road instead of coasting straight past the corner.
+    static let motionHeadingTauSeconds: TimeInterval = 0.30
+    /// Longest the target is projected past the last fix. Covers a late ~1 Hz fix without
+    /// throwing the puck far along a direction that may already be wrong.
+    static let maxProjectionSeconds: TimeInterval = 1.2
+    /// Beyond max(leashMinMeters, speed × leashSeconds) from the projected fix, stop
+    /// dead-reckoning and slide back onto the trail.
+    static let leashMinMeters: CLLocationDistance = 15
+    static let leashSeconds: TimeInterval = 1.5
+    static let leashTauSeconds: TimeInterval = 0.25
     static let maxImpliedSpeedMps: Double = 50
     static let modeTauSeconds: TimeInterval = 0.20
     /// Ease GPS speed into dead-reckon so a noisy speed sample cannot yank the camera.
@@ -129,6 +142,10 @@ struct LiveFollowCamera {
 
     private var targetCoordinate: CLLocationCoordinate2D?
     private var targetHeadingDegrees: CLLocationDirection = 0
+    /// Latest GPS direction of travel, un-eased. Drives where the puck goes; the eased
+    /// `targetHeadingDegrees` only drives how the camera turns.
+    private var travelHeadingDegrees: CLLocationDirection = 0
+    private var motionHeadingDegrees: CLLocationDirection = 0
     private var targetSpeedMps: Double = 0
     private var lastFixAt: Date?
     private var lastSampleTimestamp: Date?
@@ -139,6 +156,12 @@ struct LiveFollowCamera {
     private var publishedSpeedMps: Double = 0
     private var publishedPitchDegrees: Double = pitch3D
     private var publishedDistanceMeters: CLLocationDistance = distance3D
+
+    /// Direction the puck is actually moving. Leads the eased camera heading through a
+    /// turn, so the chevron points down the road while the map is still rotating.
+    var vehicleHeadingDegrees: CLLocationDirection {
+        hasAcceptedHeading ? motionHeadingDegrees : headingDegrees
+    }
 
     var pose: Pose? {
         guard let center else { return nil }
@@ -206,13 +229,14 @@ struct LiveFollowCamera {
             ))
         }()
         var aim: CLLocationDirection?
+        let pathBearing: CLLocationDirection? = previousSampleCoordinate.flatMap { previous in
+            moved >= Self.pathHeadingFallbackMeters
+                ? Self.bearingDegrees(from: previous, to: location.coordinate)
+                : nil
+        }
         if shouldAcceptCourse(from: location) {
             var next = Self.normalizedHeading(location.course)
-            if !reduceMotion, previousSampleCoordinate != nil, moved >= Self.pathHeadingMinMoveMeters {
-                let pathBearing = Self.bearingDegrees(
-                    from: previousSampleCoordinate!,
-                    to: location.coordinate
-                )
+            if !reduceMotion, let pathBearing, moved >= Self.pathHeadingMinMoveMeters {
                 next = Self.smoothedHeading(
                     from: next,
                     toward: pathBearing,
@@ -220,13 +244,17 @@ struct LiveFollowCamera {
                 )
             }
             aim = next
-        } else if !hasAcceptedHeading, let previousSampleCoordinate, moved >= Self.pathHeadingFallbackMeters {
-            aim = Self.bearingDegrees(from: previousSampleCoordinate, to: location.coordinate)
+        } else if let pathBearing, rawSpeed >= Self.minimumSpeedForHeadingMps {
+            // Core Location often drops `course` (simulator, urban canyons, tunnels).
+            // Holding the last heading then dead-reckons the puck off the road for good.
+            aim = pathBearing
         }
         if let aim {
+            travelHeadingDegrees = aim
             if !hasAcceptedHeading {
                 targetHeadingDegrees = aim
                 headingDegrees = aim
+                motionHeadingDegrees = aim
                 hasAcceptedHeading = true
             } else if reduceMotion {
                 targetHeadingDegrees = aim
@@ -257,6 +285,7 @@ struct LiveFollowCamera {
             snapPublished(to: target)
             if hasAcceptedHeading {
                 headingDegrees = targetHeadingDegrees
+                motionHeadingDegrees = targetHeadingDegrees
             }
             return true
         }
@@ -279,28 +308,46 @@ struct LiveFollowCamera {
         // the vehicle and lurches forward once a second. Aim at where the car should be
         // *now* instead: the reference then advances at the same rate as the puck and stays
         // continuous across fixes, because a new fix arrives exactly as old age is spent.
+        // Project along the GPS travel direction, not the eased camera heading: through a
+        // turn the camera still faces the old road and would throw the target past the corner.
         let liveTarget: CLLocationCoordinate2D = {
             guard !isStale, hasAcceptedHeading, publishedSpeedMps > 0.2 else { return target }
             return Self.coordinate(
                 from: target,
-                headingDegrees: headingDegrees,
-                distanceMeters: publishedSpeedMps * min(age, Self.maxDeadReckonSeconds)
+                headingDegrees: travelHeadingDegrees,
+                distanceMeters: publishedSpeedMps * min(age, Self.maxProjectionSeconds)
             )
         }()
 
+        if hasAcceptedHeading {
+            let motionAlpha = 1 - exp(-clampedDt / Self.motionHeadingTauSeconds)
+            motionHeadingDegrees = Self.smoothedHeading(
+                from: motionHeadingDegrees,
+                toward: travelHeadingDegrees,
+                factor: motionAlpha
+            )
+        }
+
         if let current = center {
-            if publishedSpeedMps > 0.2, hasAcceptedHeading {
+            let leash = max(Self.leashMinMeters, publishedSpeedMps * Self.leashSeconds)
+            if !isStale, Self.metres(from: current, to: liveTarget) > leash {
+                // Far off the trail (bad heading, GPS jump): slide back onto it instead of
+                // coasting further away.
+                let alpha = 1 - exp(-clampedDt / Self.leashTauSeconds)
+                center = Self.lerpCoordinate(from: current, toward: liveTarget, factor: alpha)
+            } else if publishedSpeedMps > 0.2, hasAcceptedHeading {
                 let step = publishedSpeedMps * clampedDt
                 let predicted = Self.coordinate(
                     from: current,
-                    headingDegrees: headingDegrees,
+                    headingDegrees: motionHeadingDegrees,
                     distanceMeters: step
                 )
                 center = Self.correctedTowardGPS(
                     current: predicted,
                     gps: liveTarget,
-                    headingDegrees: headingDegrees,
-                    dt: clampedDt
+                    headingDegrees: motionHeadingDegrees,
+                    dt: clampedDt,
+                    maxRetreatMeters: step
                 )
             } else if !isStale {
                 let positionAlpha = 1 - exp(-clampedDt / Self.alongCatchupTauSeconds)
@@ -356,6 +403,8 @@ struct LiveFollowCamera {
             let raw = Self.normalizedHeading(location.course)
             targetHeadingDegrees = raw
             headingDegrees = raw
+            motionHeadingDegrees = raw
+            travelHeadingDegrees = raw
             hasAcceptedHeading = true
         }
         snapPublished(to: location.coordinate)
@@ -376,6 +425,8 @@ struct LiveFollowCamera {
         hasIngestedSpeed = false
         targetCoordinate = nil
         targetHeadingDegrees = 0
+        motionHeadingDegrees = 0
+        travelHeadingDegrees = 0
         targetSpeedMps = 0
         publishedSpeedMps = 0
         lastFixAt = nil
@@ -457,12 +508,15 @@ struct LiveFollowCamera {
         return implied
     }
 
-    /// Nudge toward GPS: lateral always, along-track only when the fix is ahead.
+    /// Nudge toward GPS: lateral always; along-track catches up when the fix is ahead and
+    /// brakes when it is behind. Braking never exceeds `maxRetreatMeters` (this frame's
+    /// step), so the puck can stop but never visibly rewind.
     static func correctedTowardGPS(
         current: CLLocationCoordinate2D,
         gps: CLLocationCoordinate2D,
         headingDegrees: CLLocationDirection,
-        dt: TimeInterval
+        dt: TimeInterval,
+        maxRetreatMeters: CLLocationDistance = 0
     ) -> CLLocationCoordinate2D {
         let distance = CLLocation(latitude: current.latitude, longitude: current.longitude)
             .distance(from: CLLocation(latitude: gps.latitude, longitude: gps.longitude))
@@ -491,8 +545,20 @@ struct LiveFollowCamera {
         if along > alongCatchupDeadbandMeters {
             let catchUp = along * (1 - exp(-dt / alongCatchupTauSeconds))
             result = coordinate(from: result, headingDegrees: headingDegrees, distanceMeters: catchUp)
+        } else if along < -alongCatchupDeadbandMeters, maxRetreatMeters > 0 {
+            let brake = min(-along * (1 - exp(-dt / aheadBrakeTauSeconds)), maxRetreatMeters)
+            result = coordinate(
+                from: result,
+                headingDegrees: normalizedHeading(headingDegrees + 180),
+                distanceMeters: brake
+            )
         }
         return result
+    }
+
+    static func metres(from a: CLLocationCoordinate2D, to b: CLLocationCoordinate2D) -> CLLocationDistance {
+        CLLocation(latitude: a.latitude, longitude: a.longitude)
+            .distance(from: CLLocation(latitude: b.latitude, longitude: b.longitude))
     }
     static func alongTrackMeters(
         from: CLLocationCoordinate2D,

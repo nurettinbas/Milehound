@@ -439,10 +439,15 @@ struct LiveFollowMapKitView: UIViewRepresentable {
                     {
                         puck.coordinate = vehicle
                     }
-                    puck.headingDegrees = pose.headingDegrees
+                    puck.headingDegrees = self.session.vehicleHeadingDegrees
                 }
                 if CACurrentMediaTime() >= self.cameraEaseUntil {
-                    self.applyPuckHeading(pose.headingDegrees, on: map, animated: false)
+                    self.applyPuckHeading(
+                        self.session.vehicleHeadingDegrees,
+                        mapHeading: following ? pose.headingDegrees : nil,
+                        on: map,
+                        animated: false
+                    )
                 }
                 // Breadcrumbs land here, inside the camera transaction — never through
                 // a SwiftUI body pass (which cost a re-render + updateUIView per fix).
@@ -807,8 +812,13 @@ struct LiveFollowMapKitView: UIViewRepresentable {
                     ),
                     on: map
                 )
-                if let travel = session.pose?.headingDegrees {
-                    applyPuckHeading(travel, mapHeading: target.heading, on: map, animated: false)
+                if session.pose != nil {
+                    applyPuckHeading(
+                        session.vehicleHeadingDegrees,
+                        mapHeading: target.heading,
+                        on: map,
+                        animated: false
+                    )
                 }
                 return
             }
@@ -883,8 +893,8 @@ struct LiveFollowMapKitView: UIViewRepresentable {
                 pitchDegrees: pitch
             )
             applyCamera(pose, on: map)
-            if let travel = session.pose?.headingDegrees {
-                applyPuckHeading(travel, mapHeading: heading, on: map, animated: false)
+            if session.pose != nil {
+                applyPuckHeading(session.vehicleHeadingDegrees, mapHeading: heading, on: map, animated: false)
             }
             if linear >= 1 {
                 cancelCameraEase()
@@ -913,8 +923,8 @@ struct LiveFollowMapKitView: UIViewRepresentable {
             if cameraEase != nil {
                 mapDegrees = mapHeading ?? map.camera.heading
             } else if session.isFollowing {
-                // Camera already faces travel — keep artwork screen-up.
-                mapDegrees = travelHeading
+                // The follow camera eases behind the vehicle heading; rotate by the gap.
+                mapDegrees = mapHeading ?? session.pose?.headingDegrees ?? travelHeading
             } else {
                 mapDegrees = mapHeading ?? map.camera.heading
             }
@@ -989,8 +999,8 @@ struct LiveFollowMapKitView: UIViewRepresentable {
                 puckAnnotation.vehiclePhoto = photo
                 puckAnnotation.vehicleSystemImage = systemImage
                 puckAnnotation.isMoving = isMoving
-                if let heading = session.pose?.headingDegrees {
-                    puckAnnotation.headingDegrees = heading
+                if session.pose != nil {
+                    puckAnnotation.headingDegrees = session.vehicleHeadingDegrees
                 }
                 if let view = map.view(for: puckAnnotation) as? LiveFollowPuckAnnotationView {
                     view.isHidden = false
@@ -1004,7 +1014,7 @@ struct LiveFollowMapKitView: UIViewRepresentable {
                     vehiclePhoto: photo,
                     vehicleSystemImage: systemImage,
                     isMoving: isMoving,
-                    headingDegrees: session.pose?.headingDegrees ?? 0
+                    headingDegrees: session.pose != nil ? session.vehicleHeadingDegrees : 0
                 )
                 puckAnnotation = annotation
                 map.addAnnotation(annotation)
@@ -1290,7 +1300,7 @@ final class LiveFollowPuckAnnotationView: MKAnnotationView {
             travelHeadingDegrees: travelHeading,
             mapHeadingDegrees: mapHeading
         )
-        // Animated handoff always runs. A settled follow frame is identity every tick.
+        // Animated handoff always runs. Settled follow frames mostly repeat the same angle.
         if !animated, let lastAppliedRadians, abs(radians - lastAppliedRadians) < 0.0005 {
             return
         }

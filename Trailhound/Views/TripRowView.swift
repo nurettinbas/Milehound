@@ -11,7 +11,7 @@ struct TripRowView: View {
     var morphNamespace: Namespace.ID?
     var morphID: UUID?
     
-    /// Soft-lands the map thumbnail after stop→row morph.
+    /// Soft-lands tzhe map thumbnail after stop→row morph.
     var emphasizeLanding: Bool = false
     /// Set on the combined row element so XCTest sees it (a parent `NavigationLink` id is easy to lose).
     var rowAccessibilityIdentifier: String? = nil
