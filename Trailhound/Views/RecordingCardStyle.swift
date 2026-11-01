@@ -176,7 +176,7 @@ struct RecordingRouteChip: View {
     let action: () -> Void
     /// Live HUD: the row fills the shared route card.
     var wide: Bool = false
-    /// The route card draws the plate. The row itself stays flat.
+    /// Inside the route card the row is a full-width theme capsule, so it reads as the button.
     var embedded: Bool = false
 
     @Environment(\.colorScheme) private var colorScheme
@@ -192,7 +192,7 @@ struct RecordingRouteChip: View {
     }
 
     private var rowInk: Color {
-        embedded ? shellPalette.tintColor(for: colorScheme) : ink
+        embedded ? Color.white : ink
     }
 
     var body: some View {
@@ -212,7 +212,7 @@ struct RecordingRouteChip: View {
                     Spacer(minLength: 4)
                     Image(systemName: "chevron.right")
                         .font(.caption2.weight(.bold))
-                        .foregroundStyle(shellPalette.tintColor(for: colorScheme))
+                        .foregroundStyle(Color.white)
                         .accessibilityHidden(true)
                 }
             }
@@ -220,7 +220,11 @@ struct RecordingRouteChip: View {
             .padding(.vertical, embedded ? 7 : (wide ? 5 : 3))
             .frame(maxWidth: wide ? .infinity : nil)
             .background {
-                LiveMapHUDPlate(shape: Capsule())
+                if embedded {
+                    TrailhoundTintCapsule()
+                } else {
+                    LiveMapHUDPlate(shape: Capsule())
+                }
             }
             .contentShape(AnyShape(Capsule()))
         }

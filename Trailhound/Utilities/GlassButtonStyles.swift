@@ -45,11 +45,23 @@ private struct LightChromeProminentButtonStyle: ButtonStyle {
     }
 }
 
-/// Intrinsic-width tint capsule for in-card CTAs (recap Play). Same recipe in Light and Dark.
-private struct TrailhoundCompactProminentChromeModifier: ViewModifier {
+/// Saturated theme capsule. White label sits on it. Shared by the compact CTA and the live-map destination row.
+struct TrailhoundTintCapsule: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.shellPalette) private var shellPalette
 
+    var body: some View {
+        Capsule(style: .continuous)
+            .fill(shellPalette.tintColor(for: colorScheme))
+            .overlay {
+                Capsule(style: .continuous)
+                    .strokeBorder(Color.white.opacity(0.72), lineWidth: 1)
+            }
+    }
+}
+
+/// Intrinsic-width tint capsule for in-card CTAs (recap Play). Same recipe in Light and Dark.
+private struct TrailhoundCompactProminentChromeModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .font(.subheadline.weight(.semibold))
@@ -57,14 +69,7 @@ private struct TrailhoundCompactProminentChromeModifier: ViewModifier {
             .padding(.horizontal, 12)
             .padding(.vertical, 7)
             .fixedSize(horizontal: true, vertical: false)
-            .background {
-                Capsule(style: .continuous)
-                    .fill(shellPalette.tintColor(for: colorScheme))
-                    .overlay {
-                        Capsule(style: .continuous)
-                            .strokeBorder(Color.white.opacity(0.72), lineWidth: 1)
-                    }
-            }
+            .background { TrailhoundTintCapsule() }
             .padding(6)
             .contentShape(Capsule(style: .continuous))
     }
