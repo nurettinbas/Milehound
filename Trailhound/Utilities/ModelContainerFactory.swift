@@ -97,7 +97,10 @@ enum ModelContainerFactory {
     }
 
     static func makeInMemory() throws -> ModelContainer {
-        let config = ModelConfiguration(schema: liveSchema, isStoredInMemoryOnly: true)
+        // A fresh name so a second in-memory container does not reset models the previous
+        // test still holds. The on-disk store is untouched.
+        let name = "memory-\(UUID().uuidString)"
+        let config = ModelConfiguration(name, schema: liveSchema, isStoredInMemoryOnly: true)
         return try ModelContainer(for: liveSchema, configurations: config)
     }
 

@@ -212,9 +212,15 @@ struct TravelJournalEditPanel: View {
         )
         .accessibilityElement(children: .ignore)
         .accessibilityAddTraits(.isButton)
+        .accessibilityIdentifier(cornerGrabberIdentifier)
         .accessibilityLabel(isExpanded
             ? L10n.string("journal.map.collapse")
             : L10n.journalTrips)
+    }
+
+    private var cornerGrabberIdentifier: String {
+        guard cornerMode != nil else { return "journal.sheet.grabber" }
+        return isExpanded ? "journal.cornerCard.collapse" : "journal.cornerCard.expand"
     }
 
     /// A short lift while the sheet is compact, so the chevron reads as “pull up”.
@@ -287,6 +293,7 @@ struct TravelJournalEditPanel: View {
             .glassChrome(cornerRadius: 14, enabled: isSelected)
         }
         .buttonStyle(.glassPlainHit)
+        .accessibilityIdentifier(cornerMode != nil ? "journal.cornerCard.member" : "journal.member.\(trip.id.uuidString)")
         .animation(reduceMotion ? nil : TrailhoundMotion.gentle, value: selectedTripID)
         .listRowInsets(
             EdgeInsets(

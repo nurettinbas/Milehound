@@ -77,7 +77,8 @@ struct TrailhoundLayoutSnapshot: Equatable, Sendable {
     /// Column shares match the fully flat book. Trips and the recording card stay half
     /// the content, because that book keeps them on the hinge. There is no hinge here.
     var isPhoneBook: Bool {
-        layoutClass == .phoneLandscape
+        if UITestSupport.forcesClosedCoverLandscape { return false }
+        return layoutClass == .phoneLandscape
             && size.width >= TrailhoundLayoutResolver.phoneBookMinWidth
             && size.width < TrailhoundLayoutResolver.openFoldSpan
     }
@@ -200,6 +201,7 @@ struct TrailhoundLayoutSnapshot: Equatable, Sendable {
     /// Closed cover held sideways. Narrower than the phone book, and shorter than an iPhone
     /// (iPhone SE landscape is about 1.78, so it stays on the trailing panel).
     var isClosedCoverLandscape: Bool {
+        if UITestSupport.forcesClosedCoverLandscape, layoutClass == .phoneLandscape { return true }
         guard layoutClass == .phoneLandscape, !isPhoneBook, size.height > 1 else { return false }
         return size.width / size.height < Self.closedCoverAspectCeiling
     }

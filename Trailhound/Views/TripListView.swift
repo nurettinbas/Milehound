@@ -456,6 +456,7 @@ struct TripListView: View {
                     }
                     .glassHidesNavigationLinkIndicator()
                     .buttonStyle(.glassPlainHit)
+                    .accessibilityIdentifier("journal.row.\(journal.id.uuidString)")
                     .glassRow(position: GlassRowPosition.index(index, in: loadedJournals.count))
                     .confirmingDeleteSwipe(title: L10n.journalDelete) {
                         TravelJournalTotals.prepareForDelete(journal)

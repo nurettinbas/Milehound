@@ -138,6 +138,7 @@ final class LiveFollowPlannedRouteSnapshotTests: XCTestCase {
                             palette: .sky,
                             paused: paused,
                             tight: landscapeCover,
+                            trailingColumnLift: layoutCase.name == "duo-closed-landscape" ? 72 : 0,
                             named: "\(layoutCase.name)-\(scheme.0)-\(state)"
                         )
                     }
@@ -158,6 +159,83 @@ final class LiveFollowPlannedRouteSnapshotTests: XCTestCase {
                 tight: false,
                 named: "phone-rose-light-recording"
             )
+        }
+    }
+
+    func testDestinationSheetNearbyPlaces() {
+        let nearby = [
+            LiveFollowDestinationOption(
+                id: "nearby.cafe",
+                name: "Seed Cafe",
+                subtitle: "Cafe",
+                systemImage: "mappin.and.ellipse",
+                coordinate: CLLocationCoordinate2D(latitude: 41.01, longitude: 29.0)
+            ),
+            LiveFollowDestinationOption(
+                id: "nearby.park",
+                name: "Seed Park",
+                subtitle: "Park",
+                systemImage: "mappin.and.ellipse",
+                coordinate: CLLocationCoordinate2D(latitude: 41.02, longitude: 29.02)
+            ),
+        ]
+        let phone = TrailhoundLayoutResolver.snapshot(
+            horizontal: .compact, vertical: .regular, size: CGSize(width: 390, height: 844), idiom: .phone
+        )
+        let pad = TrailhoundLayoutResolver.snapshot(
+            horizontal: .regular, vertical: .regular, size: CGSize(width: 820, height: 1180), idiom: .pad
+        )
+        withSnapshotTesting(record: .missing) {
+            for scheme in schemes {
+                assertSheet(
+                    layout: phone,
+                    canvas: CGSize(width: 390, height: 640),
+                    scheme: scheme.1,
+                    allowsSearch: true,
+                    nearbyPlaces: nearby,
+                    named: "phone-nearby-\(scheme.0)"
+                )
+            }
+            assertSheet(
+                layout: pad,
+                canvas: CGSize(width: 580, height: 720),
+                scheme: .light,
+                allowsSearch: true,
+                nearbyPlaces: nearby,
+                named: "pad-nearby-light"
+            )
+        }
+    }
+
+    func testRouteCardOpenAndCollapsed() async {
+        let ready = await readyRouteStore()
+        let empty = PlannedRouteStore(
+            provider: SnapshotRouteProvider(result: .failure(DrivingRouteError.noRoute)),
+            isConnected: { true }
+        )
+        let open = CGSize(width: 360, height: 168)
+        let circle = CGSize(width: 360, height: 88)
+        withSnapshotTesting(record: .missing) {
+            assertRouteCard(store: ready, collapsed: false, size: open, scheme: .light, named: "open-light")
+            assertRouteCard(store: ready, collapsed: false, size: open, scheme: .dark, named: "open-dark")
+            assertRouteCard(
+                store: ready,
+                collapsed: false,
+                size: open,
+                scheme: .light,
+                direction: .rightToLeft,
+                named: "open-rtl"
+            )
+            assertRouteCard(
+                store: ready,
+                collapsed: false,
+                size: CGSize(width: 390, height: 240),
+                scheme: .dark,
+                typeSize: .accessibility3,
+                named: "open-ax3"
+            )
+            assertRouteCard(store: empty, collapsed: true, size: circle, scheme: .light, named: "circle-light")
+            assertRouteCard(store: empty, collapsed: true, size: circle, scheme: .dark, named: "circle-dark")
         }
     }
 
@@ -255,6 +333,7 @@ final class LiveFollowPlannedRouteSnapshotTests: XCTestCase {
         palette: ShellPalette,
         paused: Bool,
         tight: Bool,
+        trailingColumnLift: CGFloat = 0,
         named name: String,
         file: StaticString = #filePath,
         testName: String = #function,
@@ -273,7 +352,8 @@ final class LiveFollowPlannedRouteSnapshotTests: XCTestCase {
                 onStop: {},
                 onSelectDimension: { _ in },
                 onOverview: {},
-                onRecenter: {}
+                onRecenter: {},
+                trailingColumnLift: trailingColumnLift
             ) {
                 RecordingRouteChip(
                     content: .estimate(distance: "12.4 km", countdown: "18 min", arrival: "19:36"),
@@ -295,6 +375,7 @@ final class LiveFollowPlannedRouteSnapshotTests: XCTestCase {
         canvas: CGSize,
         scheme: ColorScheme,
         allowsSearch: Bool,
+        nearbyPlaces: [LiveFollowDestinationOption] = [],
         direction: LayoutDirection = .leftToRight,
         typeSize: DynamicTypeSize = .large,
         named name: String,
@@ -312,6 +393,7 @@ final class LiveFollowPlannedRouteSnapshotTests: XCTestCase {
                 query: .constant(""),
                 results: [],
                 isSearching: false,
+                nearbyPlaces: nearbyPlaces,
                 onPick: { _ in },
                 onClear: {},
                 onDismiss: {}
@@ -325,6 +407,59 @@ final class LiveFollowPlannedRouteSnapshotTests: XCTestCase {
         .environment(\.shellPalette, .sky)
         .frame(width: canvas.width, height: canvas.height)
         assertHosted(root, size: canvas, scheme: scheme, named: name, file: file, testName: testName, line: line)
+    }
+
+    private func readyRouteStore() async -> PlannedRouteStore {
+        let origin = CLLocationCoordinate2D(latitude: 41, longitude: 29)
+        let destination = PlannedRouteDestination(
+            id: "place.office",
+            name: "Office",
+            coordinate: CLLocationCoordinate2D(latitude: 41.01, longitude: 29)
+        )
+        let route = DrivingRoute(
+            coordinates: [origin, destination.coordinate],
+            distanceMeters: 12_400,
+            expectedTravelTime: 1_080,
+            steps: [RouteStep(instruction: "Turn left", distanceMeters: 400)]
+        )
+        let fixed = Date(timeIntervalSince1970: 1_700_000_000)
+        let store = PlannedRouteStore(
+            provider: SnapshotRouteProvider(result: .success(route)),
+            isConnected: { true }
+        )
+        store.now = { fixed }
+        store.setDestination(destination, origin: origin)
+        await store.requestTask?.value
+        return store
+    }
+
+    private func assertRouteCard(
+        store: PlannedRouteStore,
+        collapsed: Bool,
+        size: CGSize,
+        scheme: ColorScheme,
+        direction: LayoutDirection = .leftToRight,
+        typeSize: DynamicTypeSize = .large,
+        named name: String,
+        file: StaticString = #filePath,
+        testName: String = #function,
+        line: UInt = #line
+    ) {
+        let root = ZStack(alignment: .topLeading) {
+            LiveFollowChipBackdrop(scheme: scheme)
+            LiveFollowRouteCard(
+                plannedRoute: store,
+                isCollapsed: .constant(collapsed),
+                action: {}
+            )
+            .padding(16)
+        }
+        .environment(\.colorScheme, scheme)
+        .environment(\.layoutDirection, direction)
+        .environment(\.dynamicTypeSize, typeSize)
+        .environment(\.shellPalette, .sky)
+        .frame(width: size.width, height: size.height)
+        assertHosted(root, size: size, scheme: scheme, named: name, file: file, testName: testName, line: line)
     }
 
     private func assertHosted(
@@ -349,6 +484,17 @@ final class LiveFollowPlannedRouteSnapshotTests: XCTestCase {
             testName: testName,
             line: line
         )
+    }
+}
+
+private struct SnapshotRouteProvider: DrivingRouteProviding {
+    var result: Result<DrivingRoute, Error>
+
+    func route(
+        from origin: CLLocationCoordinate2D,
+        to destination: CLLocationCoordinate2D
+    ) async throws -> DrivingRoute {
+        try result.get()
     }
 }
 

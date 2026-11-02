@@ -845,6 +845,35 @@ final class LiveMapPlannedRouteUITests: LiveMapPlannedRouteUITestCase {
 
         stopRecording()
     }
+
+    func testRouteCardCollapsesAndReopens() throws {
+        try openLiveMap()
+        element("liveMap.destination").tap()
+        let place = element(seedPlaceIdentifier)
+        XCTAssertTrue(place.waitForExistence(timeout: uiTimeout))
+        place.tap()
+        XCTAssertTrue(element("liveMap.eta").waitForExistence(timeout: uiTimeout))
+
+        let collapse = element("liveMap.route.collapse")
+        XCTAssertTrue(collapse.waitForExistence(timeout: uiTimeout))
+        collapse.tap()
+        let expand = element("liveMap.route.expand")
+        XCTAssertTrue(expand.waitForExistence(timeout: uiTimeout))
+        expand.tap()
+        XCTAssertTrue(collapse.waitForExistence(timeout: uiTimeout))
+
+        stopRecording()
+    }
+
+    func testNearbyPlaceSetsTheDestination() throws {
+        try openLiveMap()
+        element("liveMap.destination").tap()
+        let nearby = element("destinationSheet.nearby.0")
+        XCTAssertTrue(nearby.waitForExistence(timeout: uiTimeout))
+        nearby.tap()
+        XCTAssertTrue(element("liveMap.eta").waitForExistence(timeout: uiTimeout))
+        stopRecording()
+    }
 }
 
 final class LiveMapPlannedRouteMovingUITests: LiveMapPlannedRouteUITestCase {
@@ -891,5 +920,42 @@ final class LiveMapPlannedRoutePadUITests: LiveMapPlannedRouteUITestCase {
         XCTAssertTrue(element("liveMap.eta").waitForExistence(timeout: uiTimeout))
 
         stopRecording()
+    }
+}
+
+final class JournalCornerCardUITests: TrailhoundUITestCase {
+    override var extraLaunchArguments: [String] { ["-UITesting.journalCoverSeed", "-UITesting.closedCover"] }
+
+    private let journalRow = "journal.row.AAAAAAAA-0000-4000-8000-0000000000C1"
+
+    override func tearDownWithError() throws {
+        XCUIDevice.shared.orientation = .portrait
+        try super.tearDownWithError()
+    }
+
+    func testCornerCardShowsAMemberThenCollapses() throws {
+        XCTAssertTrue(tripsTab.waitForExistence(timeout: uiTimeout))
+        let segment = app.segmentedControls["trips.segment"]
+        XCTAssertTrue(segment.waitForExistence(timeout: uiTimeout))
+        segment.buttons["Travels"].tap()
+
+        let row = app.descendants(matching: .any)[journalRow]
+        XCTAssertTrue(row.waitForExistence(timeout: uiTimeout))
+        row.tap()
+
+        XCUIDevice.shared.orientation = .landscapeLeft
+        let card = app.descendants(matching: .any)["journal.cornerCard"]
+        XCTAssertTrue(card.waitForExistence(timeout: uiTimeout))
+
+        let expand = app.descendants(matching: .any)["journal.cornerCard.expand"]
+        XCTAssertTrue(expand.waitForExistence(timeout: uiTimeout))
+        expand.tap()
+        let member = app.descendants(matching: .any)["journal.cornerCard.member"]
+        XCTAssertTrue(member.waitForExistence(timeout: uiTimeout))
+
+        let collapse = app.descendants(matching: .any)["journal.cornerCard.collapse"]
+        XCTAssertTrue(collapse.waitForExistence(timeout: uiTimeout))
+        collapse.tap()
+        XCTAssertTrue(member.waitForNonExistence(timeout: uiTimeout))
     }
 }
