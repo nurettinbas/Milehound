@@ -55,28 +55,44 @@ final class AppearanceTransitionCoordinator {
             return
         }
 
-        let fading = snapshots
-        DispatchQueue.main.async { [weak self] in
-            guard let self, generation == self.generation else { return }
-            let animator = UIViewPropertyAnimator(duration: duration, curve: .easeInOut) {
-                for snapshot in fading {
+        let started = generation
+        DispatchQueue.main.async {
+            MainActor.assumeIsolated {
+                AppearanceTransitionCoordinator.shared.beginFade(generation: started, duration: duration)
+            }
+        }
+    }
+
+    private func beginFade(generation started: Int, duration: TimeInterval) {
+        guard started == generation else { return }
+        guard !snapshots.isEmpty else {
+            endSignpost()
+            return
+        }
+        let animator = UIViewPropertyAnimator(duration: duration, curve: .easeInOut) {
+            MainActor.assumeIsolated {
+                for snapshot in AppearanceTransitionCoordinator.shared.snapshots {
                     snapshot.alpha = 0
                 }
             }
-            animator.addCompletion { [weak self] _ in
-                guard let self, generation == self.generation else { return }
-                for snapshot in fading {
-                    snapshot.removeFromSuperview()
-                }
-                if self.snapshots.first === fading.first {
-                    self.snapshots = []
-                }
-                self.animator = nil
-                self.endSignpost()
-            }
-            self.animator = animator
-            animator.startAnimation()
         }
+        animator.addCompletion { _ in
+            MainActor.assumeIsolated {
+                AppearanceTransitionCoordinator.shared.finishFade(generation: started)
+            }
+        }
+        self.animator = animator
+        animator.startAnimation()
+    }
+
+    private func finishFade(generation started: Int) {
+        guard started == generation else { return }
+        for snapshot in snapshots {
+            snapshot.removeFromSuperview()
+        }
+        snapshots = []
+        animator = nil
+        endSignpost()
     }
 
     private func capture(excluding hole: CGRect?) {
@@ -111,38 +127,20 @@ final class AppearanceTransitionCoordinator {
         guard CACurrentMediaTime() >= pinUntil else { return }
         pinLink?.invalidate()
         pinLink = nil
-        for pin in scrollPins {
-            pin.observation?.invalidate()
-        }
         scrollPins = []
     }
 
-    /// One scrolled list. The observation puts the offset back at the moment UIKit drops it to the top.
-    private final class ScrollPin: NSObject {
+    /// One scrolled list, recorded before the window style change drops it to the top.
+    private final class ScrollPin {
         let frame: CGRect
         let offset: CGPoint
         var corrections = 0
         var applying = false
-        var observation: NSKeyValueObservation?
 
         init(frame: CGRect, offset: CGPoint) {
             self.frame = frame
             self.offset = offset
         }
-
-        func bind(to scroll: UIScrollView) {
-            guard observation == nil || bound !== scroll else { return }
-            observation?.invalidate()
-            bound = scroll
-            observation = scroll.observe(\.contentOffset, options: [.new]) { [weak self, weak scroll] _, _ in
-                guard let self, let scroll else { return }
-                MainActor.assumeIsolated {
-                    AppearanceTransitionCoordinator.shared.correct(self, on: scroll)
-                }
-            }
-        }
-
-        private weak var bound: UIScrollView?
     }
 
     /// Keeps a scrolled-away offset. A second tap after the list has already jumped must not replace it with the top.
@@ -171,7 +169,6 @@ final class AppearanceTransitionCoordinator {
         let scrolls = scrollViews()
         for pin in scrollPins {
             guard let scroll = nearestScroll(in: scrolls, to: pin.frame) else { continue }
-            pin.bind(to: scroll)
             correct(pin, on: scroll)
         }
     }

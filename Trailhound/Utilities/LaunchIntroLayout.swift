@@ -267,13 +267,7 @@ final class LaunchIntroSession {
     private(set) var coversFirstScreen = false
     private(set) var openedFromURL = false
     private(set) var openedFromNotification = false
-    /// Bumps when Settings asks to play the intro again. Cold launch stays at 0.
-    private(set) var replayGeneration = 0
     private var didClaimScene = false
-
-    func replay() {
-        replayGeneration += 1
-    }
 
     func noteURLOpen() {
         openedFromURL = true

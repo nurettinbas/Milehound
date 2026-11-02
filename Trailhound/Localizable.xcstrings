@@ -15146,23 +15146,6 @@
     "series" : {
 
     },
-    "settings.about.play_launch_intro" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Play launch intro"
-          }
-        },
-        "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Açılış animasyonunu oynat"
-          }
-        }
-      }
-    },
     "settings.about.privacy" : {
       "extractionState" : "stale",
       "localizations" : {

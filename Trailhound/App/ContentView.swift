@@ -17,7 +17,6 @@ struct ContentView: View {
     @State private var presentedLayout = TrailhoundLayoutSnapshot.phone
     @State private var launchIntroPlays = false
     @State private var launchIntroSettled = false
-    @State private var launchIntroGeneration = 0
     @State private var contentSettleScale: CGFloat = 1
     /// The app is built only once the intro’s first frame is on screen, so the system launch screen
     /// does not wait for the whole tab hierarchy.
@@ -106,15 +105,6 @@ struct ContentView: View {
         .onChange(of: LaunchIntroSession.shared.openedFromNotification) { _, opened in
             guard opened, launchIntroPlays else { return }
             finishLaunchIntro(playedMotion: false)
-        }
-        .onChange(of: LaunchIntroSession.shared.replayGeneration) { _, generation in
-            guard generation > 0 else { return }
-            launchIntroGeneration = generation
-            launchIntroSettled = false
-            launchIntroPlays = true
-            if !reduceMotion {
-                contentSettleScale = TrailhoundMotion.launchIntroContentSettleScale
-            }
         }
         .onChange(of: appLockService.isUnlocked) { _, unlocked in
             if !unlocked {
@@ -227,7 +217,6 @@ struct ContentView: View {
                         finishLaunchIntro(playedMotion: playedMotion)
                     }
                 )
-                .id(launchIntroGeneration)
             } else {
                 LaunchIntroLaunchFill()
             }

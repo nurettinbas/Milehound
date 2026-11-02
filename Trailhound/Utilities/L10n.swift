@@ -361,7 +361,6 @@ enum L10n {
     static var settingsExportPreparing: String { string("settings.backup.exporting") }
     static var settingsShareFile: String { string("settings.backup.share") }
     static var settingsAboutSection: String { string("settings.about.section") }
-    static var settingsPlayLaunchIntro: String { string("settings.about.play_launch_intro") }
     static var settingsVersion: String { string("settings.about.version") }
     static var settingsAboutPrivacy: String { string("settings.about.privacy") }
     static var settingsReportProblem: String { string("settings.report_problem") }

@@ -454,28 +454,10 @@ struct SettingsView: View {
                 settingsSectionAnchor(.about)
                 LabeledContent(L10n.settingsVersion, value: appVersion)
                     .glassRow(position: .first)
-                Button(L10n.settingsPlayLaunchIntro) {
-                    LaunchIntroSession.shared.replay()
-                }
-                .accessibilityIdentifier("settings.playLaunchIntro")
-                .glassRow(position: .middle)
                 Button(L10n.settingsReportProblem) {
                     showReportProblem = true
                 }
                 .accessibilityIdentifier("settings.reportProblem")
-                .glassRow(position: .middle)
-                Button {
-                    openTipJar()
-                } label: {
-                    GlassFeaturedRowLabel(
-                        systemImage: "heart.fill",
-                        title: L10n.settingsTipJar,
-                        subtitle: L10n.settingsTipJarSubtitle
-                    )
-                    .glassMorphPanelSource(isHidden: tipJarSourceHidden)
-                }
-                .buttonStyle(.glassPlainHit)
-                .accessibilityIdentifier("settings.tipJar")
                 .glassRow(position: .middle)
                 Link(L10n.settingsPrivacyPolicy, destination: SupportMail.privacyPolicyURL)
                     .accessibilityIdentifier("settings.privacyPolicy")
@@ -496,6 +478,19 @@ struct SettingsView: View {
                     .font(.footnote)
                     .glassSecondaryInk()
                     .glassRow(position: .middle)
+                Button {
+                    openTipJar()
+                } label: {
+                    GlassFeaturedRowLabel(
+                        systemImage: "heart.fill",
+                        title: L10n.settingsTipJar,
+                        subtitle: L10n.settingsTipJarSubtitle
+                    )
+                    .glassMorphPanelSource(isHidden: tipJarSourceHidden)
+                }
+                .buttonStyle(.glassPlainHit)
+                .accessibilityIdentifier("settings.tipJar")
+                .glassRow(position: .middle)
                 Text(L10n.settingsDevelopedBy(DeveloperInfo.name))
                     .font(.footnote)
                     .glassSecondaryInk()
