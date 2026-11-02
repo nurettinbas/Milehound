@@ -843,8 +843,7 @@ struct TripListView: View {
                 }
             }
             .onChange(of: isMergeMode) { _, _ in syncWideBookStatusActions() }
-            .onChange(of: listMode) { _, _ in syncWideBookStatusActions() }
-    }
+            .onChange(of: listMode) { _, _ in syncWideBookStatusActions() }    }
 
     private func tripListSceneHooks<Content: View>(content: Content) -> some View {
         content
@@ -953,24 +952,9 @@ struct TripListView: View {
     private func tripsSplit(scrollProxy: ScrollViewProxy) -> some View {
         let recording = recordingService.state.isActiveSession && endCredits == nil
         let live = showLiveFollowMap && recording
-        if recording, paneTripID != nil, !live, let trip = paneTrip {
-            TrailhoundPaneSplit {
-                TripDetailView(trip: trip)
-                    .id(trip.id)
-                    .environment(\.tripDetailRegion, .details)
-                    .toolbar {
-                        ToolbarItem(placement: .topBarLeading) {
-                            Button {
-                                paneTripID = nil
-                            } label: {
-                                GlassToolbarSymbol(systemName: "chevron.backward")
-                            }
-                        }
-                    }
-            } focus: {
-                recordingPane
-            }
-        } else if layout.recordingCardLeads {
+        let openTrip = recording ? paneTrip : nil
+        // The open trip takes the list's pane, so the map or card keeps its own.
+        if layout.recordingCardLeads {
             TrailhoundPaneSplit(leadingFillsVertically: live) {
                 if live {
                     liveFollowMap
@@ -978,11 +962,19 @@ struct TripListView: View {
                     recordingPane
                 }
             } focus: {
-                tripList(scrollProxy: scrollProxy)
+                if let openTrip {
+                    recordingPaneTripDetail(openTrip)
+                } else {
+                    tripList(scrollProxy: scrollProxy)
+                }
             }
         } else {
             TrailhoundPaneSplit(focusFillsVertically: live) {
-                tripList(scrollProxy: scrollProxy)
+                if let openTrip {
+                    recordingPaneTripDetail(openTrip)
+                } else {
+                    tripList(scrollProxy: scrollProxy)
+                }
             } focus: {
                 if live {
                     liveFollowMap
@@ -991,6 +983,20 @@ struct TripListView: View {
                 }
             }
         }
+    }
+
+    /// The navigation bar is hidden over the live map and owned by the shell beside the
+    /// card, so Back rides on the pane's own route map.
+    private func recordingPaneTripDetail(_ trip: Trip) -> some View {
+        TripDetailView(trip: trip)
+            .id(trip.id)
+            .environment(\.tripDetailRegion, .stacked)
+            .overlay(alignment: .topLeading) {
+                GlassToolbarBackButton {
+                    paneTripID = nil
+                }
+                .padding(12)
+            }
     }
 
     private func recordingFoldStack(scrollProxy: ScrollViewProxy) -> some View {
@@ -1749,6 +1755,14 @@ struct TripListView: View {
         }
     }
 
+    /// The upright fold stacks the recording card over the list and has no trip pane,
+    /// so a trip opened while recording there is pushed instead.
+    private var tripRowOpensInPane: Bool {
+        guard layout.opensTripInPane else { return false }
+        let recording = recordingService.state.isActiveSession && endCredits == nil
+        return !(recording && layout.pinsRecordingCardToFold)
+    }
+
     @ViewBuilder
     private func tripRow(for trip: Trip, isFirst: Bool) -> some View {
         let isMorphing = morphingTripID == trip.id
@@ -1761,7 +1775,7 @@ struct TripListView: View {
                     .accessibilityLabel(isSelected ? L10n.a11ySelected : L10n.a11yNotSelected)
             }
             Group {
-                if layout.opensTripInPane, !isMergeMode {
+                if tripRowOpensInPane, !isMergeMode {
                     Button {
                         paneTripID = trip.id
                     } label: {

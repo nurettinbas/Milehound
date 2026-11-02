@@ -117,6 +117,8 @@ struct TripDetailView: View {
                 detailsPage
             } else if tripDetailRegion == .map {
                 tripDetailMapLayer(interactive: true)
+            } else if tripDetailRegion == .stacked {
+                stackedBody
             } else if layout.tripDetailStyle == .overlay {
                 phoneBody
             } else {
@@ -203,14 +205,18 @@ struct TripDetailView: View {
                 }
             }
         case .stacked:
-            GeometryReader { geo in
-                VStack(spacing: 0) {
-                    tripDetailMapLayer(interactive: true)
-                        .frame(height: geo.size.height * 0.55)
-                        .background { mapSizeReader }
-                    detailsPage
-                        .frame(maxHeight: .infinity)
-                }
+            stackedBody
+        }
+    }
+
+    private var stackedBody: some View {
+        GeometryReader { geo in
+            VStack(spacing: 0) {
+                tripDetailMapLayer(interactive: true)
+                    .frame(height: geo.size.height * 0.55)
+                    .background { mapSizeReader }
+                detailsPage
+                    .frame(maxHeight: .infinity)
             }
         }
     }
@@ -306,7 +312,7 @@ struct TripDetailView: View {
     /// Split and the embedded details pane sit on `TrailhoundPaneSplit`'s atmosphere.
     /// Floating and stacked pages still need their own wash.
     private var paintsOwnAtmosphere: Bool {
-        tripDetailRegion != .details && layout.tripDetailStyle != .split
+        tripDetailRegion == .automatic && layout.tripDetailStyle != .split
     }
 
     private var phoneBody: some View {
