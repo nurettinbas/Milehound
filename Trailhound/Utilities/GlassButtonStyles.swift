@@ -60,6 +60,45 @@ struct TrailhoundTintCapsule: View {
     }
 }
 
+/// Soft tint wave that rolls out from a collapsed control's edge, then rests — says "tap me" without a badge.
+/// Draws outside the control and never takes hits. Reduce Motion shows nothing.
+private struct TrailhoundTapRipple<S: Shape>: ViewModifier {
+    let shape: S
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.shellPalette) private var shellPalette
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private static var travel: Double { 1.6 }
+    private static var period: Double { 2.8 }
+    private static var spread: CGFloat { 9 }
+
+    func body(content: Content) -> some View {
+        content.background {
+            if !reduceMotion {
+                TimelineView(.animation) { context in
+                    let t = context.date.timeIntervalSinceReferenceDate
+                        .truncatingRemainder(dividingBy: Self.period) / Self.travel
+                    let progress = CGFloat(min(t, 1))
+                    let eased = 1 - (1 - progress) * (1 - progress)
+                    shape
+                        .stroke(shellPalette.tintColor(for: colorScheme), lineWidth: 1.5)
+                        .padding(-Self.spread * eased)
+                        .opacity(0.55 * Double(1 - progress))
+                }
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+            }
+        }
+    }
+}
+
+extension View {
+    /// Tap-affordance wave around a collapsed glass control. Pass the control's own shape.
+    func trailhoundTapRipple<S: Shape>(_ shape: S) -> some View {
+        modifier(TrailhoundTapRipple(shape: shape))
+    }
+}
+
 /// Intrinsic-width tint capsule for in-card CTAs (recap Play). Same recipe in Light and Dark.
 private struct TrailhoundCompactProminentChromeModifier: ViewModifier {
     func body(content: Content) -> some View {

@@ -1390,11 +1390,13 @@ struct LiveFollowRouteCard: View {
                 .frame(height: side)
                 .contentShape(Capsule())
                 .liveMapHUDPlate(Capsule(), interactive: true)
+                .trailhoundTapRipple(Capsule())
             } else {
                 disc
                     .frame(width: side, height: side)
                     .contentShape(Circle())
                     .liveMapHUDPlate(Circle(), interactive: true)
+                    .trailhoundTapRipple(Circle())
             }
         }
         .buttonStyle(.glassPlainHit)

@@ -1364,6 +1364,8 @@ struct TripListView: View {
                 }
                 .listRowInsets(EdgeInsets())
                 .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+                .listSectionSeparator(.hidden)
                 .listSectionSpacing(6)
             }
 
