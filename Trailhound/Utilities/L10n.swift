@@ -273,6 +273,8 @@ enum L10n {
     static var placePickerNewTitle: String { string("place.picker.new_title") }
     static var placePickerSave: String { string("place.picker.save") }
     static var placePrivacyZoneHint: String { string("place.privacy_zone.hint") }
+    static var settingsPlacesSection: String { string("settings.places.section") }
+    static var settingsPlacesSubtitle: String { string("settings.places.subtitle") }
     static var settingsFavoritePlaces: String { string("settings.favorite_places") }
     static var settingsFavoritePlacesHint: String { string("settings.favorite_places.hint") }
     static var settingsFavoritePlacesEmpty: String { string("settings.favorite_places.empty") }

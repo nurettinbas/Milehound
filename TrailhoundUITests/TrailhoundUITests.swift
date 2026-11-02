@@ -462,6 +462,11 @@ final class TrailhoundSmartCategoryUITests: TrailhoundUITestCase {
         XCTAssertTrue(settingsTab.waitForExistence(timeout: uiTimeout))
         settingsTab.tap()
 
+        let places = app.descendants(matching: .any)["settings.places"]
+        revealSettingsControl(places)
+        XCTAssertTrue(places.waitForExistence(timeout: uiTimeout))
+        places.tap()
+
         let toggle = app.switches["settings.smartCategory"]
         revealSettingsControl(toggle)
         XCTAssertTrue(toggle.waitForExistence(timeout: uiTimeout))

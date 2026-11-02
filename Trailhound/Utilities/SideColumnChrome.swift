@@ -154,6 +154,9 @@ final class SideColumnChromeState {
     private(set) var isTransitioning = false
     /// False while a cover hides the tab root. The overlay is off, so the toolbar keeps the pair.
     private(set) var rootClear = true
+    /// Places and categories on the Duo side column. Back sits under the bell instead of beside it.
+    private(set) var showsSettingsDetailBack = false
+    private var settingsDetailBackAction: (@MainActor () -> Void)?
     private(set) var windowSize: CGSize = .zero
     private(set) var safeInsets: UIEdgeInsets = .zero
     private(set) var tabBarFrame: CGRect?
@@ -173,6 +176,20 @@ final class SideColumnChromeState {
     func setRootClear(_ clear: Bool) {
         guard rootClear != clear else { return }
         rootClear = clear
+    }
+
+    func claimSettingsDetailBack(_ action: @escaping @MainActor () -> Void) {
+        settingsDetailBackAction = action
+        showsSettingsDetailBack = true
+    }
+
+    func releaseSettingsDetailBack() {
+        settingsDetailBackAction = nil
+        showsSettingsDetailBack = false
+    }
+
+    func performSettingsDetailBack() {
+        settingsDetailBackAction?()
     }
 
     func update(

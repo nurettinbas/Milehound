@@ -135,6 +135,7 @@ extension View {
 /// Bell, then the Trips action when that action is showing. One vertical Liquid Glass capsule.
 struct DuoSideStatusCapsule: View {
     @Bindable private var tabSelection = TabSelection.shared
+    @Bindable private var chrome = SideColumnChromeState.shared
 
     private var showsTripsTrailing: Bool {
         tabSelection.selectedTab == .trips && tabSelection.wideBookTrailingVisible
@@ -148,6 +149,15 @@ struct DuoSideStatusCapsule: View {
     var body: some View {
         VStack(spacing: 0) {
             TrailhoundNotificationBell()
+            if chrome.showsSettingsDetailBack {
+                Button {
+                    chrome.performSettingsDetailBack()
+                } label: {
+                    GlassToolbarSymbol(systemName: "chevron.backward")
+                }
+                .accessibilityLabel(Text("onboarding.back"))
+                .accessibilityIdentifier("settings.places.back")
+            }
             if showsSplitPair {
                 splitAction(systemName: "plus", label: L10n.journalNew, identifier: SideColumnChromeID.newJournal) {
                     tabSelection.triggerNewJournal()

@@ -141,11 +141,14 @@ struct ContentView: View {
 
     /// Bell, plus the Trips action when that action is in the bar. Nil keeps both in the toolbar.
     private var duoStatusCapsuleFrame: CGRect? {
-        let count = sideColumnChrome.duoCapsuleButtonCount(
+        var count = sideColumnChrome.duoCapsuleButtonCount(
             tripsTab: tabSelection.selectedTab == .trips,
             splitPair: tabSelection.wideBookShowsPlusAndMerge,
             singleTrailing: tabSelection.selectedTab == .trips && tabSelection.wideBookTrailingVisible
         )
+        if sideColumnChrome.showsSettingsDetailBack {
+            count += 1
+        }
         return sideColumnChrome.uprightDuoCapsuleFrame(
             buttonCount: count,
             layout: layoutSnapshot

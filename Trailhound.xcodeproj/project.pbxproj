@@ -343,6 +343,7 @@
 		A1APPTEXTSIZE0000001 /* AppTextSize.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2APPTEXTSIZE0000001 /* AppTextSize.swift */; };
 		A1APPLANGUAGE0000001 /* AppLanguage.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2APPLANGUAGE0000001 /* AppLanguage.swift */; };
 		A1APPEARSETVIEW00001 /* AppearanceSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2APPEARSETVIEW00001 /* AppearanceSettingsView.swift */; };
+		A1PLACESSETVIEW00001 /* PlacesSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2PLACESSETVIEW00001 /* PlacesSettingsView.swift */; };
 		A1LANGSETVIEW0000001 /* LanguageSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2LANGSETVIEW0000001 /* LanguageSettingsView.swift */; };
 		A1CATMGMT00000000000001 /* CategoryManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2CATMGMT00000000000001 /* CategoryManagementView.swift */; };
 		A1LOCALIZABLE00000000001 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = A2LOCALIZABLE00000000001 /* Localizable.xcstrings */; };
@@ -914,6 +915,7 @@
 		A2APPTEXTSIZE0000001 /* AppTextSize.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppTextSize.swift; sourceTree = "<group>"; };
 		A2APPLANGUAGE0000001 /* AppLanguage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLanguage.swift; sourceTree = "<group>"; };
 		A2APPEARSETVIEW00001 /* AppearanceSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Settings/AppearanceSettingsView.swift; sourceTree = "<group>"; };
+		A2PLACESSETVIEW00001 /* PlacesSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Settings/PlacesSettingsView.swift; sourceTree = "<group>"; };
 		A2LANGSETVIEW0000001 /* LanguageSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Settings/LanguageSettingsView.swift; sourceTree = "<group>"; };
 		A2CATMGMT00000000000001 /* CategoryManagementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryManagementView.swift; sourceTree = "<group>"; };
 		A2LOCALIZABLE00000000001 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
@@ -1299,6 +1301,7 @@
 				A5PAIRINGGRP00000000001 /* Pairing */,
 				A20000000000000000000017 /* SettingsView.swift */,
 				A2APPEARSETVIEW00001 /* AppearanceSettingsView.swift */,
+				A2PLACESSETVIEW00001 /* PlacesSettingsView.swift */,
 				A2LANGSETVIEW0000001 /* LanguageSettingsView.swift */,
 				A2TIPJARVIEW000000001 /* TipJarView.swift */,
 				A2ACKNOWLEDGEMENTS0001 /* AcknowledgementsView.swift */,
@@ -2016,6 +2019,7 @@
 				A1APPTEXTSIZE0000001 /* AppTextSize.swift in Sources */,
 				A1APPLANGUAGE0000001 /* AppLanguage.swift in Sources */,
 				A1APPEARSETVIEW00001 /* AppearanceSettingsView.swift in Sources */,
+				A1PLACESSETVIEW00001 /* PlacesSettingsView.swift in Sources */,
 				A1LANGSETVIEW0000001 /* LanguageSettingsView.swift in Sources */,
 				A1CATMGMT00000000000001 /* CategoryManagementView.swift in Sources */,
 				55259EE2E03648A4B6AAC434 /* FuelCostCalculator.swift in Sources */,

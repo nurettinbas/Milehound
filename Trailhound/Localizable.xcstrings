@@ -16132,6 +16132,40 @@
         }
       }
     },
+    "settings.places.section" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Places and categories"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Yerler ve kategoriler"
+          }
+        }
+      }
+    },
+    "settings.places.subtitle" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Favorite places, categories, and smart categories"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Favori yerler, kategoriler ve akıllı kategoriler"
+          }
+        }
+      }
+    },
     "settings.personalization.section" : {
       "extractionState" : "manual",
       "localizations" : {
