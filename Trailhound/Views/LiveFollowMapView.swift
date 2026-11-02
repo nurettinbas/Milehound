@@ -507,8 +507,7 @@ struct LiveFollowMapView: View {
         guard landscapeDuoCover else { return 0 }
         let trailing = layoutDirection == .rightToLeft ? safe.left : safe.right
         let leading = layoutDirection == .rightToLeft ? safe.right : safe.left
-        guard trailing > leading, trailing > 20 else { return 0 }
-        return min(max(trailing, 52), 88)
+        return TrailhoundLayoutSnapshot.closedCoverCameraLift(trailing: trailing, leading: leading)
     }
 
     /// Closed landscape cover: the punch hole owns the top corner. The circle sits under it.

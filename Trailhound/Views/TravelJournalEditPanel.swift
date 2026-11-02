@@ -1,6 +1,11 @@
 import SwiftData
 import SwiftUI
 
+enum TravelJournalCornerMode: Equatable {
+    case compact
+    case expanded
+}
+
 struct TravelJournalEditPanel: View {
     @Bindable var journal: TravelJournal
     let trips: [Trip]
@@ -10,6 +15,8 @@ struct TravelJournalEditPanel: View {
     let isExpanded: Bool
     /// Wide landscape and the open book. The trip list fills the pane. No sheet grabber.
     var fillsColumn: Bool = false
+    /// Closed cover, landscape. Compact is the summary; expanded is the summary plus the trips.
+    var cornerMode: TravelJournalCornerMode? = nil
     var columnTopInset: CGFloat = 0
     var columnBottomInset: CGFloat = 0
     let reduceMotion: Bool
@@ -20,15 +27,79 @@ struct TravelJournalEditPanel: View {
     var onToggleExpanded: () -> Void
     var onGrabberDragChanged: (CGFloat) -> Void
     var onGrabberDragEnded: (CGFloat) -> Void
+    /// Closed cover only. Height of the grabber and summary, which is the whole compact card.
+    var onCornerSummaryHeight: (CGFloat) -> Void = { _ in }
 
     @Bindable private var settings = AppSettings.shared
     @State private var grabberHint = false
 
-    private var showsTrips: Bool { fillsColumn || isExpanded }
+    private var showsTrips: Bool { fillsColumn || isExpanded || cornerMode == .expanded }
+
+    private var showsGrabber: Bool { !fillsColumn }
 
     var body: some View {
+        if cornerMode != nil {
+            cornerBody
+        } else {
+            sheetBody
+        }
+    }
+
+    /// Compact, the summary keeps its natural height, so the card ends under the metrics.
+    /// Expanded, the summary and the trips scroll together under the grabber.
+    private var cornerBody: some View {
         VStack(spacing: 0) {
-            if !fillsColumn {
+            if showsTrips {
+                panelGrabber
+                List {
+                    cornerSummaryRow
+                    cornerTripRows
+                }
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                .scrollIndicators(.hidden)
+                .scrollBounceBehavior(.basedOnSize)
+                .contentMargins(.bottom, TripDetailKeyboardLayout.restingScrollBottomInset, for: .scrollContent)
+            } else {
+                VStack(spacing: 0) {
+                    panelGrabber
+                    panelHeader
+                        .padding(.horizontal, GlassTokens.listContentHorizontalInset)
+                        .padding(.top, 4)
+                        .padding(.bottom, 12)
+                }
+                .fixedSize(horizontal: false, vertical: true)
+                .background {
+                    GeometryReader { proxy in
+                        Color.clear
+                            .onAppear { onCornerSummaryHeight(proxy.size.height) }
+                            .onChange(of: proxy.size.height) { _, height in
+                                onCornerSummaryHeight(height)
+                            }
+                    }
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    }
+
+    private var cornerSummaryRow: some View {
+        panelHeader
+            .listRowInsets(
+                EdgeInsets(
+                    top: 4,
+                    leading: GlassTokens.listContentHorizontalInset,
+                    bottom: 12,
+                    trailing: GlassTokens.listContentHorizontalInset
+                )
+            )
+            .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
+    }
+
+    private var sheetBody: some View {
+        VStack(spacing: 0) {
+            if showsGrabber {
                 panelGrabber
             }
 
@@ -48,18 +119,7 @@ struct TravelJournalEditPanel: View {
                 }
 
                 if showsTrips {
-                    ForEach(dayGroups, id: \.day) { group in
-                        Section {
-                            ForEach(group.trips, id: \.id) { trip in
-                                tripRow(trip)
-                            }
-                        } header: {
-                            Text(DateFormatters.tripDateOnly.string(from: group.day))
-                                .font(.caption.weight(.semibold))
-                                .glassSecondaryInk()
-                                .textCase(nil)
-                        }
-                    }
+                    tripSections
                 }
             }
             .listStyle(.plain)
@@ -77,6 +137,43 @@ struct TravelJournalEditPanel: View {
         .frame(maxWidth: .infinity, maxHeight: fillsColumn ? .infinity : nil)
         .frame(height: fillsColumn ? nil : restHeight)
         .animation(reduceMotion || fillsColumn ? nil : TrailhoundMotion.sheetRise, value: isExpanded)
+    }
+
+    /// Day labels are rows, not plain-list section headers, so none of them pins under the grabber.
+    private var cornerTripRows: some View {
+        ForEach(dayGroups, id: \.day) { group in
+            Text(DateFormatters.tripDateOnly.string(from: group.day))
+                .font(.caption.weight(.semibold))
+                .glassSecondaryInk()
+                .listRowInsets(
+                    EdgeInsets(
+                        top: 10,
+                        leading: GlassTokens.listContentHorizontalInset,
+                        bottom: 4,
+                        trailing: GlassTokens.listContentHorizontalInset
+                    )
+                )
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+            ForEach(group.trips, id: \.id) { trip in
+                tripRow(trip)
+            }
+        }
+    }
+
+    private var tripSections: some View {
+        ForEach(dayGroups, id: \.day) { group in
+            Section {
+                ForEach(group.trips, id: \.id) { trip in
+                    tripRow(trip)
+                }
+            } header: {
+                Text(DateFormatters.tripDateOnly.string(from: group.day))
+                    .font(.caption.weight(.semibold))
+                    .glassSecondaryInk()
+                    .textCase(nil)
+            }
+        }
     }
 
     private var panelGrabber: some View {
@@ -142,21 +239,15 @@ struct TravelJournalEditPanel: View {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(journal.title)
-                        .font(.headline)
+                        .font(cornerMode == nil ? .headline : .subheadline.weight(.semibold))
+                        .lineLimit(cornerMode == .compact ? 1 : nil)
                     Text(L10n.journalDateRange(start: journal.startedOn, end: journal.endedOn))
-                        .font(.caption)
+                        .font(cornerMode == nil ? .caption : .caption2)
                         .glassSecondaryInk()
+                        .lineLimit(1)
                 }
-                Spacer()
-                Button(action: onEdit) {
-                    Text(L10n.string("journal.edit"))
-                        .font(.subheadline.weight(.semibold))
-                        .glassAccentForeground()
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 8)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.glassPlainHit)
+                Spacer(minLength: 8)
+                editButton
             }
 
             if let note = journal.note, !note.isEmpty {
@@ -168,6 +259,18 @@ struct TravelJournalEditPanel: View {
 
             metricRow
         }
+    }
+
+    private var editButton: some View {
+        Button(action: onEdit) {
+            Text(L10n.string("journal.edit"))
+                .font(cornerMode == nil ? .subheadline.weight(.semibold) : .caption.weight(.semibold))
+                .glassAccentForeground()
+                .padding(.horizontal, cornerMode == nil ? 10 : 6)
+                .padding(.vertical, 8)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.glassPlainHit)
     }
 
     private func tripRow(_ trip: Trip) -> some View {

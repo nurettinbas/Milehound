@@ -286,6 +286,21 @@ enum TrailhoundTabBarCompact {
         return tabBar.convert(tabBar.bounds, to: window)
     }
 
+    /// Visible glass pill of a side tab, in window coordinates. `platterFrame` is the
+    /// icon union, which stops short of the pill's rounded ends.
+    static func sidePillFrame(of tabBar: UITabBar, in window: UIWindow) -> CGRect? {
+        guard tabBar.bounds.height > tabBar.bounds.width * 1.4 else { return nil }
+        let bar = tabBar.convert(tabBar.bounds, to: window)
+        if let cached = cachedVisiblePill, sameFrame(cached.bar, bar) {
+            return cached.pill
+        }
+        guard let pill = sideIconPill(in: window, bar: bar) else { return nil }
+        cachedVisiblePill = (bar, pill)
+        return pill
+    }
+
+    private static var cachedVisiblePill: (bar: CGRect, pill: CGRect)?
+
     /// Union of the tab icons. The column view itself runs up under the clock;
     /// the icons start lower, and that top is what the bell has to clear.
     private static func sideIconUnion(in window: UIWindow, column: CGRect) -> CGRect? {
@@ -563,7 +578,9 @@ final class TrailhoundTabBarCompactController: UIViewController {
         let chrome = SideColumnChromeState.shared
         guard !chrome.isTransitioning else { return }
         guard let window = view.window ?? keyWindow() else { return }
-        let frame = primaryTabBar().map { TrailhoundTabBarCompact.platterFrame(of: $0, in: window) }
+        let tabBar = primaryTabBar()
+        let frame = tabBar.map { TrailhoundTabBarCompact.platterFrame(of: $0, in: window) }
+        let pill = tabBar.flatMap { TrailhoundTabBarCompact.sidePillFrame(of: $0, in: window) }
         let direction: LayoutDirection = window.effectiveUserInterfaceLayoutDirection == .rightToLeft
             ? .rightToLeft
             : .leftToRight
@@ -576,6 +593,7 @@ final class TrailhoundTabBarCompactController: UIViewController {
             windowSize: window.bounds.size,
             safeInsets: window.safeAreaInsets,
             tabBarFrame: frame,
+            sidePillFrame: pill,
             layoutDirection: direction,
             statusClusterMaxY: status
         )

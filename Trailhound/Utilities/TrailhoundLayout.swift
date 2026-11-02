@@ -180,12 +180,35 @@ struct TrailhoundLayoutSnapshot: Equatable, Sendable {
         return false
     }
 
+    /// Closed cover is shorter than a phone. Portrait compares height to width; landscape compares width to height.
+    static let closedCoverAspectCeiling: CGFloat = 1.75
+
     /// Closed Duo cover, and the upright open fold when it is still shorter than a phone.
     /// The welcome column centers in that height instead of running off the top and bottom.
     var centersOnboardingColumn: Bool {
         if layoutClass == .duoOpen, !isLandscape { return true }
         guard layoutClass == .phone, size.width > 1 else { return false }
-        return size.height / size.width < 1.75
+        return size.height / size.width < Self.closedCoverAspectCeiling
+    }
+
+    /// Closed cover held upright. Shorter than an iPhone, so the travel sheet does not use the phone's tall detent.
+    var isClosedCoverPortrait: Bool {
+        guard layoutClass == .phone, size.width > 1 else { return false }
+        return size.height / size.width < Self.closedCoverAspectCeiling
+    }
+
+    /// Closed cover held sideways. Narrower than the phone book, and shorter than an iPhone
+    /// (iPhone SE landscape is about 1.78, so it stays on the trailing panel).
+    var isClosedCoverLandscape: Bool {
+        guard layoutClass == .phoneLandscape, !isPhoneBook, size.height > 1 else { return false }
+        return size.width / size.height < Self.closedCoverAspectCeiling
+    }
+
+    /// Closed landscape cover. The punch hole owns the trailing corner, so a bottom-trailing
+    /// control lifts clear of it. A top-leading camera leaves the control on the bottom edge.
+    static func closedCoverCameraLift(trailing: CGFloat, leading: CGFloat) -> CGFloat {
+        guard trailing > leading, trailing > 20 else { return 0 }
+        return min(max(trailing, 52), 88)
     }
 
     /// Upright bottom sheet beside a side tab. The leading gap matches the margin

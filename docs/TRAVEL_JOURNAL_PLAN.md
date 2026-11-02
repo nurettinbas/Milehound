@@ -133,7 +133,7 @@ Paging: `TravelJournalPage` — `pageSize` 50, `pageLimit + 1` probe, sort `ende
 
 ### Travel detail
 
-Same skeleton as trip detail: full-screen MapKit + bottom glass panel. Do not resize the map with panel height; use `MapFitContext.detailOverlay`. Elevation stays **`.flat`**.
+Same skeleton as trip detail: full-screen MapKit + bottom glass panel. Do not resize the map with panel height; use `MapFitContext.detailOverlay`. Elevation stays **`.flat`**. On the upright Duo, open or the closed cover, the pulled-up sheet stops at half the page (`duoExpandedFraction` 0.5). A taller phone still opens to 0.72.
 
 **Map**
 
@@ -152,7 +152,7 @@ Same skeleton as trip detail: full-screen MapKit + bottom glass panel. Do not re
 - Day sections (`TripDateGrouping` / start-of-day) → existing trip row chrome → `navigationDestination(for: Trip.self)` into `TripDetailView`
 - Remove-from-journal (swipe) nullifies membership and refreshes totals
 
-**Wide landscape** (phone book and open Duo, `tripDetailStyle == .split`): the member list is the leading pane, top to bottom, on the split’s one atmosphere. No grabber, no second wash, no rounded plate. Trips are visible without pulling the sheet up. The route map fills the trailing pane (top, bottom, and trailing edge). The expand control still opens the map across the window. A narrower landscape phone keeps the bottom sheet. iPad landscape keeps the trailing card.
+**Wide landscape** (phone book and open Duo, `tripDetailStyle == .split`): the member list is the leading pane, top to bottom, on the split’s one atmosphere. No grabber, no second wash, no rounded plate. Trips are visible without pulling the sheet up. The route map fills the trailing pane (top, bottom, and trailing edge). The expand control still opens the map across the window. On the closed Duo cover in landscape (`isClosedCoverLandscape`), the map fills the screen and the journal is the phone sheet at the bottom-trailing corner, at most one third of the screen wide, on the same lightweight atmosphere. It arrives as the summary. Pulling the grabber up lists the trips and the card can fill the screen. Pulling down returns the summary. The route stays in the map above the card. A narrower landscape phone that is not that cover keeps the 380 pt trailing card. iPad landscape keeps the trailing card.
 
 ### Trip detail
 
