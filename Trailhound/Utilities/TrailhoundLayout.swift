@@ -43,6 +43,8 @@ enum TripDetailRegion: Equatable, Sendable {
     case automatic
     case details
     case map
+    /// Route over details in one pane, beside the recording card or the live map.
+    case stacked
 }
 
 struct TrailhoundLayoutSnapshot: Equatable, Sendable {
