@@ -2744,6 +2744,75 @@ extension View {
     }
 }
 
+/// Four "Aa" tiles. The outline slides; the value label crossfades. The size change itself is not animated.
+struct GlassTextSizePicker: View {
+    @Binding var selection: AppTextSize
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.shellPalette) private var shellPalette
+    @Environment(\.colorScheme) private var colorScheme
+    @Namespace private var selectionSpace
+    @State private var displayed: AppTextSize?
+
+    var body: some View {
+        let shown = displayed ?? selection
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text(L10n.settingsTextSizeTitle)
+                    .font(.caption.weight(.semibold))
+                    .glassSecondaryInk()
+                    .textCase(.uppercase)
+                Spacer(minLength: 8)
+                Text(L10n.string(selection.titleKey))
+                    .font(.caption.weight(.semibold))
+                    .glassAccentForeground()
+                    .contentTransition(.opacity)
+                    .animation(reduceMotion ? nil : TrailhoundMotion.settingsLabelSwap, value: selection)
+            }
+            HStack(spacing: 8) {
+                ForEach(AppTextSize.allCases) { size in
+                    Button {
+                        guard selection != size else { return }
+                        AppearanceTransitionCoordinator.shared.perform(reduceMotion: reduceMotion) {
+                            selection = size
+                        }
+                    } label: {
+                        Text("Aa")
+                            .font(.system(size: size.samplePointSize, weight: .medium))
+                            .dynamicTypeSize(.large)
+                            .glassPrimaryInk()
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                            .background {
+                                if shown == size {
+                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                        .strokeBorder(shellPalette.tintColor(for: colorScheme), lineWidth: 1.5)
+                                        .matchedGeometryEffect(id: "text-size", in: selectionSpace)
+                                }
+                            }
+                    }
+                    .buttonStyle(.glassPlainHit)
+                    .accessibilityLabel(L10n.string(size.titleKey))
+                    .accessibilityAddTraits(selection == size ? .isSelected : [])
+                    .accessibilityIdentifier("settings.textSize.\(size.rawValue)")
+                }
+            }
+        }
+        .padding(.vertical, 4)
+        .onAppear { displayed = selection }
+        .onChange(of: selection) { _, newValue in
+            if reduceMotion {
+                displayed = newValue
+            } else {
+                withAnimation(TrailhoundMotion.snappy) {
+                    displayed = newValue
+                }
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("settings.textSize")
+    }
+}
+
 private struct GlassCarouselPageModifier: ViewModifier {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 

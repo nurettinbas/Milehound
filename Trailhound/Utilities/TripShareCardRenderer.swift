@@ -265,6 +265,7 @@ enum TripShareCardRenderer {
         .environment(\.shellPalette, palette)
         .environment(\.colorScheme, scheme)
         .preferredColorScheme(scheme)
+        .trailhoundShareCaptureEnvironment()
 
         let renderer = ImageRenderer(content: poster)
         renderer.proposedSize = ProposedViewSize(width: layout.width, height: layout.height)

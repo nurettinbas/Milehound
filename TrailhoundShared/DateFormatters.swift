@@ -3,7 +3,7 @@ import Foundation
 
 public enum DateFormatters {
     public static var currentLocale: Locale {
-        .current
+        SharedLanguage.locale
     }
 
     public static func tripDateFormatter() -> DateFormatter {

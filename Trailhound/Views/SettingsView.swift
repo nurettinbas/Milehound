@@ -8,8 +8,6 @@ import UserNotifications
 enum SettingsPane: String, CaseIterable, Identifiable, Hashable {
     case recording
     case places
-    case categories
-    case smartCategory
     case appearance
     case language
     case fuel
@@ -23,9 +21,7 @@ enum SettingsPane: String, CaseIterable, Identifiable, Hashable {
     var title: String {
         switch self {
         case .recording: L10n.settingsRecordingSection
-        case .places: L10n.settingsFavoritePlaces
-        case .categories: L10n.categorySection
-        case .smartCategory: L10n.settingsSmartCategorySection
+        case .places: L10n.settingsPlacesSection
         case .appearance: L10n.settingsAppearanceSection
         case .language: L10n.settingsLanguageSection
         case .fuel: L10n.settingsFuelSection
@@ -54,7 +50,6 @@ struct SettingsView: View {
     @State private var showExportSheet = false
     @State private var isExporting = false
     @State private var showAppLockUnavailableAlert = false
-    @State private var showAddPlacePicker = false
     @State private var showReportProblem = false
     @State private var tipJarSourceHidden = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -193,134 +188,51 @@ struct SettingsView: View {
 
             Section {
                 settingsSectionAnchor(.places)
-                Button {
-                    showAddPlacePicker = true
+                NavigationLink {
+                    PlacesSettingsView()
                 } label: {
-                    Label(L10n.settingsAddPlace, systemImage: "plus.circle.fill")
-                        .font(.body.weight(.semibold))
-                        .glassPrimaryInk()
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.glassPlainHit)
-                .glassRow(position: .first)
-
-                if places.isEmpty {
-                    Text(L10n.settingsFavoritePlacesEmpty)
-                        .font(.subheadline)
-                        .glassSecondaryInk()
-                        .glassRow(position: .last)
-                }
-
-                ForEach(Array(places.enumerated()), id: \.element.id) { index, place in
-                    NavigationLink {
-                        PlacePickerView(editingPlace: place)
-                    } label: {
-                        HStack(spacing: 10) {
-                            Image(systemName: place.kind.systemImage)
-                                .font(.subheadline)
-                                .glassSecondaryInk()
-                                .frame(width: 18)
-                            Text(place.name)
-                                .font(.subheadline)
-                                .lineLimit(1)
-                            Spacer(minLength: 8)
-                            Text(place.kind.displayName)
-                                .font(.caption2)
-                                .glassSecondaryInk()
-                            GlassDisclosureChevron()
-                        }
-                    }
-                    .glassHidesNavigationLinkIndicator()
-                    .glassRow(position: favoritePlacePosition(placeIndex: index))
-                    .listRowInsets(
-                        EdgeInsets(
-                            top: 7,
-                            leading: GlassTokens.listContentHorizontalInset,
-                            bottom: 7,
-                            trailing: GlassTokens.listContentHorizontalInset
-                        )
+                    GlassFeaturedRowLabel(
+                        systemImage: "mappin.and.ellipse",
+                        title: L10n.settingsPlacesSection,
+                        subtitle: L10n.settingsPlacesSubtitle
                     )
-                    .confirmingDeleteSwipe {
-                        deletePlace(place)
-                    }
                 }
-            } header: {
-                Text(L10n.settingsFavoritePlaces)
-            } footer: {
-                Text(L10n.settingsFavoritePlacesHint)
-            }
-
-            CategoryManagementView(
-                focusedField: $focusedField,
-                settingsSectionTracker: $settingsSectionTracker
-            )
-
-            Section {
-                settingsSectionAnchor(.smartCategory)
-                Toggle(L10n.settingsSmartCategoryToggle, isOn: $settings.smartCategorySuggestionsEnabled)
-                    .glassToggleStyle()
-                    .accessibilityIdentifier("settings.smartCategory")
-                    .glassRow(position: settings.smartCategorySuggestionsEnabled ? .first : .only)
-                if settings.smartCategorySuggestionsEnabled {
-                    LabeledContent(L10n.settingsSmartCategoryWorkStart) {
-                        Picker(L10n.settingsSmartCategoryWorkStart, selection: $settings.workHourStart) {
-                            ForEach(Array(0..<24), id: \.self) { hour in
-                                Text(Self.hourLabel(hour)).tag(hour)
-                            }
-                        }
-                        .glassMenuPicker()
-                    }
-                    .accessibilityIdentifier("settings.smartCategory.workStart")
-                    .glassRow(position: .middle)
-                    LabeledContent(L10n.settingsSmartCategoryWorkEnd) {
-                        Picker(L10n.settingsSmartCategoryWorkEnd, selection: $settings.workHourEnd) {
-                            ForEach(Array(0..<24), id: \.self) { hour in
-                                Text(Self.hourLabel(hour)).tag(hour)
-                            }
-                        }
-                        .glassMenuPicker()
-                    }
-                    .accessibilityIdentifier("settings.smartCategory.workEnd")
-                    .glassRow(position: .last)
-                }
-            } header: {
-                Text(L10n.settingsSmartCategorySection)
-            } footer: {
-                Text(L10n.settingsSmartCategoryHint)
-            }
-
-            Section {
-                settingsSectionAnchor(.appearance)
-                Picker(L10n.settingsAppearancePicker, selection: $settings.appearanceMode) {
-                    Text(L10n.settingsAppearanceSystem).tag(AppearanceMode.system)
-                    Text(L10n.settingsAppearanceLight).tag(AppearanceMode.light)
-                    Text(L10n.settingsAppearanceDark).tag(AppearanceMode.dark)
-                }
-                .glassSegmentedStyle()
-                .labelsHidden()
-                .accessibilityIdentifier("settings.appearance")
-                .glassRow(position: .first)
-                ShellPalettePicker(selection: $settings.shellPalette)
-                    .glassRow(position: .last)
-            } header: {
-                Text(L10n.settingsAppearanceSection)
-            } footer: {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(L10n.settingsAppearanceHint)
-                    Text(L10n.settingsShellPaletteHint)
-                }
-            }
-
-            Section {
-                settingsSectionAnchor(.language)
-                Button(L10n.settingsOpenSystemSettings) {
-                    SystemSettingsLink.openAppPage()
-                }
+                .glassHidesNavigationLinkIndicator()
+                .accessibilityIdentifier("settings.places")
                 .glassRow(position: .only)
+            }
+
+            Section {
+                ThemeModeHeroRow()
+                    .glassRow(position: .first)
+                settingsSectionAnchor(.appearance)
+                NavigationLink {
+                    AppearanceSettingsView()
+                } label: {
+                    GlassFeaturedRowLabel(
+                        systemImage: "paintpalette.fill",
+                        title: L10n.settingsAppearanceSection,
+                        subtitle: appearanceSummary
+                    )
+                }
+                .glassHidesNavigationLinkIndicator()
+                .accessibilityIdentifier("settings.appearance")
+                .glassRow(position: .middle)
+                settingsSectionAnchor(.language)
+                NavigationLink {
+                    LanguageSettingsView()
+                } label: {
+                    GlassFeaturedRowLabel(
+                        systemImage: "globe",
+                        title: L10n.settingsLanguageSection,
+                        subtitle: languageSummary
+                    )
+                }
+                .glassHidesNavigationLinkIndicator()
+                .accessibilityIdentifier("settings.language")
+                .glassRow(position: .last)
             } header: {
-                Text(L10n.settingsLanguageSection)
-            } footer: {
-                Text(L10n.settingsLanguageSystemHint)
+                Text(L10n.settingsPersonalizationSection)
             }
 
             Section(L10n.settingsFuelSection) {
@@ -455,28 +367,10 @@ struct SettingsView: View {
                 settingsSectionAnchor(.about)
                 LabeledContent(L10n.settingsVersion, value: appVersion)
                     .glassRow(position: .first)
-                Button(L10n.settingsPlayLaunchIntro) {
-                    LaunchIntroSession.shared.replay()
-                }
-                .accessibilityIdentifier("settings.playLaunchIntro")
-                .glassRow(position: .middle)
                 Button(L10n.settingsReportProblem) {
                     showReportProblem = true
                 }
                 .accessibilityIdentifier("settings.reportProblem")
-                .glassRow(position: .middle)
-                Button {
-                    openTipJar()
-                } label: {
-                    GlassFeaturedRowLabel(
-                        systemImage: "heart.fill",
-                        title: L10n.settingsTipJar,
-                        subtitle: L10n.settingsTipJarSubtitle
-                    )
-                    .glassMorphPanelSource(isHidden: tipJarSourceHidden)
-                }
-                .buttonStyle(.glassPlainHit)
-                .accessibilityIdentifier("settings.tipJar")
                 .glassRow(position: .middle)
                 Link(L10n.settingsPrivacyPolicy, destination: SupportMail.privacyPolicyURL)
                     .accessibilityIdentifier("settings.privacyPolicy")
@@ -497,6 +391,19 @@ struct SettingsView: View {
                     .font(.footnote)
                     .glassSecondaryInk()
                     .glassRow(position: .middle)
+                Button {
+                    openTipJar()
+                } label: {
+                    GlassFeaturedRowLabel(
+                        systemImage: "heart.fill",
+                        title: L10n.settingsTipJar,
+                        subtitle: L10n.settingsTipJarSubtitle
+                    )
+                    .glassMorphPanelSource(isHidden: tipJarSourceHidden)
+                }
+                .buttonStyle(.glassPlainHit)
+                .accessibilityIdentifier("settings.tipJar")
+                .glassRow(position: .middle)
                 Text(L10n.settingsDevelopedBy(DeveloperInfo.name))
                     .font(.footnote)
                     .glassSecondaryInk()
@@ -522,9 +429,6 @@ struct SettingsView: View {
         }
         }
         .navigationBarTitleDisplayMode(.inline)
-        .navigationDestination(isPresented: $showAddPlacePicker) {
-            PlacePickerView()
-        }
         // The split already paints the shell. A second atmosphere clipped to this
         // pane is a different-colored plate behind the form.
         .glassListChrome(showsAtmosphere: !layout.isPhoneBook)
@@ -626,8 +530,21 @@ struct SettingsView: View {
         .animation(.easeInOut(duration: 0.2), value: isExporting)
     }
 
-    private var favoritePlacesRowCount: Int {
-        (places.isEmpty ? 1 : 0) + places.count + 1
+    private var appearanceSummary: String {
+        "\(L10n.shellPaletteName(settings.shellPalette)) · \(L10n.string(settings.textSize.titleKey))"
+    }
+
+    private var languageSummary: String {
+        let language = AppLanguageStore.shared.language
+        switch language {
+        case .system:
+            let name = SharedLanguage.preferredSystemCode() == "tr"
+                ? AppLanguage.tr.nativeName
+                : AppLanguage.en.nativeName
+            return L10n.settingsLanguageSystemSubtitle(name)
+        case .en, .tr:
+            return language.nativeName
+        }
     }
 
     private func refreshNotificationAuthorization() {
@@ -677,14 +594,6 @@ struct SettingsView: View {
             try? FileManager.default.removeItem(at: reportFileURL)
         }
         reportFileURL = nil
-    }
-
-    private func favoritePlacePosition(placeIndex: Int) -> GlassRowPosition {
-        GlassRowPosition.index(placeIndex + 1, in: favoritePlacesRowCount)
-    }
-
-    private static func hourLabel(_ hour: Int) -> String {
-        String(format: "%02d:00", hour)
     }
 
     private enum ExportFormat {
@@ -745,12 +654,6 @@ struct SettingsView: View {
         }
     }
 
-    private func deletePlace(_ place: SavedPlace) {
-        modelContext.delete(place)
-        try? modelContext.save()
-        ToastPresenter.shared.show(.deleted)
-    }
-
     /// The row dissolves, then the root panel grows; the row sharpens back while the panel shrinks.
     private func openTipJar() {
         guard !tipJarSourceHidden else { return }
@@ -791,50 +694,6 @@ struct SettingsView: View {
                 }
             }
         )
-    }
-}
-
-private struct ShellPalettePicker: View {
-    @Binding var selection: ShellPalette
-    @Environment(\.colorScheme) private var colorScheme
-
-    private let columns = Array(repeating: GridItem(.flexible(), spacing: 10), count: 5)
-
-    var body: some View {
-        LazyVGrid(columns: columns, spacing: 12) {
-            ForEach(ShellPalette.allCases) { palette in
-                Button {
-                    selection = palette
-                } label: {
-                    ZStack {
-                        Circle()
-                            .fill(
-                                LinearGradient(
-                                    colors: palette.gradientColors(for: colorScheme),
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                )
-                            )
-                        if selection == palette {
-                            Circle()
-                                .strokeBorder(Color.white, lineWidth: 2.5)
-                            Image(systemName: "checkmark")
-                                .font(.caption.weight(.bold))
-                                .foregroundStyle(Color.white)
-                        }
-                    }
-                    .frame(width: 36, height: 36)
-                    .shadow(color: Color.black.opacity(0.18), radius: 2, y: 1)
-                }
-                .buttonStyle(.glassPlainHit)
-                .accessibilityLabel(L10n.shellPaletteName(palette))
-                .accessibilityAddTraits(selection == palette ? .isSelected : [])
-                .accessibilityIdentifier("settings.shellPalette.\(palette.rawValue)")
-            }
-        }
-        .padding(.vertical, 8)
-        .accessibilityIdentifier("settings.shellPalette")
-        .accessibilityElement(children: .contain)
     }
 }
 

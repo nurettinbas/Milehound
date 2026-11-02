@@ -338,6 +338,13 @@
 		A1USERCATEGORY00000000001 /* UserCategory.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2USERCATEGORY00000000001 /* UserCategory.swift */; };
 		A1CATEGORYSEEDER00000001 /* CategorySeeder.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2CATEGORYSEEDER00000001 /* CategorySeeder.swift */; };
 		A1L10N00000000000000001 /* L10n.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2L10N00000000000000001 /* L10n.swift */; };
+		A1APPEARTRANS0000001 /* AppearanceTransition.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2APPEARTRANS0000001 /* AppearanceTransition.swift */; };
+		A1GLASSDAYNIGHT00001 /* GlassDayNightSwitch.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2GLASSDAYNIGHT00001 /* GlassDayNightSwitch.swift */; };
+		A1APPTEXTSIZE0000001 /* AppTextSize.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2APPTEXTSIZE0000001 /* AppTextSize.swift */; };
+		A1APPLANGUAGE0000001 /* AppLanguage.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2APPLANGUAGE0000001 /* AppLanguage.swift */; };
+		A1APPEARSETVIEW00001 /* AppearanceSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2APPEARSETVIEW00001 /* AppearanceSettingsView.swift */; };
+		A1PLACESSETVIEW00001 /* PlacesSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2PLACESSETVIEW00001 /* PlacesSettingsView.swift */; };
+		A1LANGSETVIEW0000001 /* LanguageSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2LANGSETVIEW0000001 /* LanguageSettingsView.swift */; };
 		A1CATMGMT00000000000001 /* CategoryManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2CATMGMT00000000000001 /* CategoryManagementView.swift */; };
 		A1LOCALIZABLE00000000001 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = A2LOCALIZABLE00000000001 /* Localizable.xcstrings */; };
 		A1REC0BSERVER00000000001 /* RecordingRequestObserver.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2REC0BSERVER00000000001 /* RecordingRequestObserver.swift */; };
@@ -903,6 +910,13 @@
 		A2USERCATEGORY00000000001 /* UserCategory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserCategory.swift; sourceTree = "<group>"; };
 		A2CATEGORYSEEDER00000001 /* CategorySeeder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategorySeeder.swift; sourceTree = "<group>"; };
 		A2L10N00000000000000001 /* L10n.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = L10n.swift; sourceTree = "<group>"; };
+		A2APPEARTRANS0000001 /* AppearanceTransition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppearanceTransition.swift; sourceTree = "<group>"; };
+		A2GLASSDAYNIGHT00001 /* GlassDayNightSwitch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassDayNightSwitch.swift; sourceTree = "<group>"; };
+		A2APPTEXTSIZE0000001 /* AppTextSize.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppTextSize.swift; sourceTree = "<group>"; };
+		A2APPLANGUAGE0000001 /* AppLanguage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLanguage.swift; sourceTree = "<group>"; };
+		A2APPEARSETVIEW00001 /* AppearanceSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Settings/AppearanceSettingsView.swift; sourceTree = "<group>"; };
+		A2PLACESSETVIEW00001 /* PlacesSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Settings/PlacesSettingsView.swift; sourceTree = "<group>"; };
+		A2LANGSETVIEW0000001 /* LanguageSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Settings/LanguageSettingsView.swift; sourceTree = "<group>"; };
 		A2CATMGMT00000000000001 /* CategoryManagementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryManagementView.swift; sourceTree = "<group>"; };
 		A2LOCALIZABLE00000000001 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		A2VEHICLEPROFILE00000001 /* VehicleProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VehicleProfile.swift; sourceTree = "<group>"; };
@@ -1286,6 +1300,9 @@
 				A5VCAREGRP000000000001 /* VehicleCare */,
 				A5PAIRINGGRP00000000001 /* Pairing */,
 				A20000000000000000000017 /* SettingsView.swift */,
+				A2APPEARSETVIEW00001 /* AppearanceSettingsView.swift */,
+				A2PLACESSETVIEW00001 /* PlacesSettingsView.swift */,
+				A2LANGSETVIEW0000001 /* LanguageSettingsView.swift */,
 				A2TIPJARVIEW000000001 /* TipJarView.swift */,
 				A2ACKNOWLEDGEMENTS0001 /* AcknowledgementsView.swift */,
 				A2CATMGMT00000000000001 /* CategoryManagementView.swift */,
@@ -1377,6 +1394,10 @@
 				A2SPEEDCOLORSEGBUILD001 /* SpeedColoredSegmentBuilder.swift */,
 				A2CATEGORYSEEDER00000001 /* CategorySeeder.swift */,
 				A2L10N00000000000000001 /* L10n.swift */,
+				A2APPEARTRANS0000001 /* AppearanceTransition.swift */,
+				A2GLASSDAYNIGHT00001 /* GlassDayNightSwitch.swift */,
+				A2APPTEXTSIZE0000001 /* AppTextSize.swift */,
+				A2APPLANGUAGE0000001 /* AppLanguage.swift */,
 				A2SUPPORTMAIL00000001 /* SupportMail.swift */,
 				A2DRIVINGSAFETY000001 /* DrivingSafetyNotice.swift */,
 				A2DEVELOPERINFO000001 /* DeveloperInfo.swift */,
@@ -1993,6 +2014,13 @@
 				A1USERCATEGORY00000000001 /* UserCategory.swift in Sources */,
 				A1CATEGORYSEEDER00000001 /* CategorySeeder.swift in Sources */,
 				A1L10N00000000000000001 /* L10n.swift in Sources */,
+				A1APPEARTRANS0000001 /* AppearanceTransition.swift in Sources */,
+				A1GLASSDAYNIGHT00001 /* GlassDayNightSwitch.swift in Sources */,
+				A1APPTEXTSIZE0000001 /* AppTextSize.swift in Sources */,
+				A1APPLANGUAGE0000001 /* AppLanguage.swift in Sources */,
+				A1APPEARSETVIEW00001 /* AppearanceSettingsView.swift in Sources */,
+				A1PLACESSETVIEW00001 /* PlacesSettingsView.swift in Sources */,
+				A1LANGSETVIEW0000001 /* LanguageSettingsView.swift in Sources */,
 				A1CATMGMT00000000000001 /* CategoryManagementView.swift in Sources */,
 				55259EE2E03648A4B6AAC434 /* FuelCostCalculator.swift in Sources */,
 				C2D27E073A644138899E28CE /* ModelContainerFactory.swift in Sources */,

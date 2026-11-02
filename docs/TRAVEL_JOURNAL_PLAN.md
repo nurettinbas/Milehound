@@ -238,7 +238,7 @@ Primary EN + TR in `Localizable.xcstrings`. Suggested keys:
 | `journal.remove` | Remove from travel | Seyahatten çıkar |
 | `journal.stats.filter` | Travel | Seyahat |
 
-Language follows the system (no in-app language override). Currency still uses `FuelCostCalculator` / `AppSettings` (default ₺).
+Language follows Settings → Personalization → Language (English, Türkçe, or the iPhone language). Currency still uses `FuelCostCalculator` / `AppSettings` (default ₺).
 
 Share v1: keep per-trip share cards. A multi-snapshot travel poster is explicitly later (expensive, blocks UI if naively composed).
 

@@ -2,6 +2,14 @@
 
 Trailhound optimizes frame time in a few hot paths. Use this when profiling regressions.
 
+## Settings appearance, text size, and language
+
+- A Light/Dark, text-size, or language change does not animate the SwiftUI tree. `AppearanceTransitionCoordinator` takes one `snapshotView(afterScreenUpdates: false)` per app window (a render-server copy), applies the new value with animations disabled, and fades that copy from 1 to 0 in 0.28 s (`TrailhoundMotion.appearanceCrossfadeDuration`). The day/night knob is cut out of the snapshot so its own spring is the only thing moving there.
+- A second tap before the fade ends does not take another snapshot. The first cover stays, its opacity returns to 1, and the fade starts again. Covers are removed in the animator completion, so they cannot stack.
+- The knob is under ten small shapes, one `compositingGroup` on the knob, and no `TimelineView`. Stars scale in once during the spring and then stop.
+- Language resolves the bundle and locale once per change (`SharedLanguage`). Date and distance formatters read that cache. Text size is one `DynamicTypeSize` step at the root.
+- Instruments → os_signpost, subsystem `com.trailhound.app`, category `Performance`, name `settings.appearanceTransition`. The interval covers the fade. On device the fade should hitch-free, the first frame under the cover should land within 120 ms, and ten fast taps should not grow the snapshot count. This session did not run that Instruments pass (no device attached); confirm those three on an iPhone 12-class phone before calling the motion done.
+
 ## Vehicle pairing editor
 
 - Edits use `VehicleEditorDraft` and persist on **Save** only (no SwiftData writes per keystroke).

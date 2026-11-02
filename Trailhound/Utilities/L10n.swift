@@ -273,6 +273,8 @@ enum L10n {
     static var placePickerNewTitle: String { string("place.picker.new_title") }
     static var placePickerSave: String { string("place.picker.save") }
     static var placePrivacyZoneHint: String { string("place.privacy_zone.hint") }
+    static var settingsPlacesSection: String { string("settings.places.section") }
+    static var settingsPlacesSubtitle: String { string("settings.places.subtitle") }
     static var settingsFavoritePlaces: String { string("settings.favorite_places") }
     static var settingsFavoritePlacesHint: String { string("settings.favorite_places.hint") }
     static var settingsFavoritePlacesEmpty: String { string("settings.favorite_places.empty") }
@@ -291,15 +293,26 @@ enum L10n {
     static var settingsPairVehicleHint: String { string("settings.vehicle_pairing.hint") }
     static var settingsDefineVehicle: String { string("settings.vehicle_pairing.define") }
     static var settingsAppearanceSection: String { string("settings.appearance.section") }
-    static var settingsAppearancePicker: String { string("settings.appearance.picker") }
-    static var settingsAppearanceSystem: String { string("settings.appearance.system") }
-    static var settingsAppearanceLight: String { string("settings.appearance.light") }
-    static var settingsAppearanceDark: String { string("settings.appearance.dark") }
     static var settingsAppearanceHint: String { string("settings.appearance.hint") }
+    static var settingsAppearanceSubtitle: String { string("settings.appearance.subtitle") }
+    static var settingsAppearancePreviewTitle: String { string("settings.appearance.preview.title") }
+    static var settingsAppearancePreviewDetail: String { string("settings.appearance.preview.detail") }
     static var settingsShellPaletteHint: String { string("settings.shell_palette.hint") }
+    static var settingsPersonalizationSection: String { string("settings.personalization.section") }
+    static var settingsThemeLightTitle: String { string("settings.theme.light.title") }
+    static var settingsThemeDarkTitle: String { string("settings.theme.dark.title") }
+    static var settingsThemeLightHint: String { string("settings.theme.light.hint") }
+    static var settingsThemeDarkHint: String { string("settings.theme.dark.hint") }
+    static var settingsThemeMatchSystem: String { string("settings.theme.match_system") }
+    static var settingsTextSizeTitle: String { string("settings.text_size.title") }
+    static var settingsLanguageSystem: String { string("settings.language.system") }
+
+    static func settingsLanguageSystemSubtitle(_ name: String) -> String {
+        String(format: string("settings.language.subtitle"), name)
+    }
 
     static func shellPaletteName(_ palette: ShellPalette) -> String {
-        SharedL10n.text("settings.shell_palette.\(palette.rawValue)", bundle: .main)
+        string("settings.shell_palette.\(palette.rawValue)")
     }
     static var settingsSmartCategorySection: String { string("settings.smart_category.section") }
     static var settingsSmartCategoryToggle: String { string("settings.smart_category.toggle") }
@@ -307,7 +320,6 @@ enum L10n {
     static var settingsSmartCategoryWorkStart: String { string("settings.smart_category.work_start") }
     static var settingsSmartCategoryWorkEnd: String { string("settings.smart_category.work_end") }
     static var settingsLanguageSection: String { string("settings.language.section") }
-    static var settingsLanguageSystemHint: String { string("settings.language.system_hint") }
     static var settingsFuelSection: String { string("settings.fuel.section") }
     static var settingsFuelConsumption: String { string("settings.fuel.consumption") }
     static var settingsFuelPrice: String { string("settings.fuel.price") }
@@ -351,7 +363,6 @@ enum L10n {
     static var settingsExportPreparing: String { string("settings.backup.exporting") }
     static var settingsShareFile: String { string("settings.backup.share") }
     static var settingsAboutSection: String { string("settings.about.section") }
-    static var settingsPlayLaunchIntro: String { string("settings.about.play_launch_intro") }
     static var settingsVersion: String { string("settings.about.version") }
     static var settingsAboutPrivacy: String { string("settings.about.privacy") }
     static var settingsReportProblem: String { string("settings.report_problem") }

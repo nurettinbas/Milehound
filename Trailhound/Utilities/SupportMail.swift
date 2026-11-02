@@ -14,7 +14,10 @@ enum SupportMail {
 
     /// The KVKK notice must be readable in Turkish, so a Turkish UI opens the Turkish policy.
     static var privacyPolicyURL: URL {
-        privacyPolicyURL(preferredLocalizations: Bundle.main.preferredLocalizations)
+        let code = SharedLanguage.locale.language.languageCode?.identifier
+            ?? Bundle.main.preferredLocalizations.first
+            ?? "en"
+        return privacyPolicyURL(preferredLocalizations: [code])
     }
 
     static func privacyPolicyURL(preferredLocalizations: [String]) -> URL {

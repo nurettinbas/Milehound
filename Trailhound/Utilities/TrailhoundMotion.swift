@@ -4,6 +4,12 @@ import UIKit
 
 enum TrailhoundMotion {
     static let snappy = Animation.snappy(duration: 0.28)
+    /// Day/night knob, sun-to-crescent cut, cloud, and stars. One spring, no loop.
+    static let dayNightSwitch = Animation.spring(response: 0.42, dampingFraction: 0.78)
+    /// Full-window snapshot fade after a theme, language, or text-size change.
+    static let appearanceCrossfadeDuration: TimeInterval = 0.28
+    /// Settings row title and subtitle swap. Shorter than the window fade.
+    static let settingsLabelSwap = Animation.easeOut(duration: 0.18)
     /// Tab content switch.
     static let tabSwitch = Animation.easeOut(duration: 0.15)
     /// Notifications playback switch thumb — short snappy slide, no mush.

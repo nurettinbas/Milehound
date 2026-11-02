@@ -17,7 +17,6 @@ struct ContentView: View {
     @State private var presentedLayout = TrailhoundLayoutSnapshot.phone
     @State private var launchIntroPlays = false
     @State private var launchIntroSettled = false
-    @State private var launchIntroGeneration = 0
     @State private var contentSettleScale: CGFloat = 1
     /// The app is built only once the intro’s first frame is on screen, so the system launch screen
     /// does not wait for the whole tab hierarchy.
@@ -28,6 +27,7 @@ struct ContentView: View {
     @State private var tabsOrigin: CGPoint = .zero
 
     var body: some View {
+        AppLanguageRefresh {
         ZStack {
             Group {
             if !contentMounted {
@@ -49,6 +49,7 @@ struct ContentView: View {
             }
         }
         .preferredColorScheme(settings.appearanceMode.preferredColorScheme)
+        .appTextSizeScope()
         .onGlassShell()
         .glassMorphPanelHost()
         .recapCardExpandHost()
@@ -81,7 +82,9 @@ struct ContentView: View {
             .coordinateSpace(name: TrailhoundWindowSpace.name)
             .environment(\.trailhoundLayout, layoutSnapshot)
             .environment(\.shellPalette, settings.shellPalette)
+            .environment(\.locale, AppLanguageStore.shared.locale)
             .preferredColorScheme(settings.appearanceMode.preferredColorScheme)
+            .appTextSizeScope()
             .onGlassShell()
             .toastHost()
             .deleteConfirmHost()
@@ -103,15 +106,6 @@ struct ContentView: View {
             guard opened, launchIntroPlays else { return }
             finishLaunchIntro(playedMotion: false)
         }
-        .onChange(of: LaunchIntroSession.shared.replayGeneration) { _, generation in
-            guard generation > 0 else { return }
-            launchIntroGeneration = generation
-            launchIntroSettled = false
-            launchIntroPlays = true
-            if !reduceMotion {
-                contentSettleScale = TrailhoundMotion.launchIntroContentSettleScale
-            }
-        }
         .onChange(of: appLockService.isUnlocked) { _, unlocked in
             if !unlocked {
                 RecapCardExpandPresenter.shared.dismissImmediately()
@@ -131,6 +125,7 @@ struct ContentView: View {
             rememberPresentedLayout()
             syncWindowFill()
         }
+        }
     }
 
     /// A turn already moves the window. A second spring fades the old page over the new one.
@@ -146,11 +141,14 @@ struct ContentView: View {
 
     /// Bell, plus the Trips action when that action is in the bar. Nil keeps both in the toolbar.
     private var duoStatusCapsuleFrame: CGRect? {
-        let count = sideColumnChrome.duoCapsuleButtonCount(
+        var count = sideColumnChrome.duoCapsuleButtonCount(
             tripsTab: tabSelection.selectedTab == .trips,
             splitPair: tabSelection.wideBookShowsPlusAndMerge,
             singleTrailing: tabSelection.selectedTab == .trips && tabSelection.wideBookTrailingVisible
         )
+        if sideColumnChrome.showsSettingsDetailBack {
+            count += 1
+        }
         return sideColumnChrome.uprightDuoCapsuleFrame(
             buttonCount: count,
             layout: layoutSnapshot
@@ -222,7 +220,6 @@ struct ContentView: View {
                         finishLaunchIntro(playedMotion: playedMotion)
                     }
                 )
-                .id(launchIntroGeneration)
             } else {
                 LaunchIntroLaunchFill()
             }
@@ -515,11 +512,21 @@ private struct TrailhoundRootTint: ViewModifier {
     @Environment(\.shellPalette) private var shellPalette
 
     func body(content: Content) -> some View {
+        content.tint(chromeTint)
+    }
+
+    /// White Light tint plates the iOS 26 toolbar, so that case uses the tab selection color.
+    /// The modifier stays in place so a theme change does not rebuild the tabs.
+    private var chromeTint: Color {
         if colorScheme == .light, GlassEngineResolver.lightAvoidsWhiteChromeTint {
-            content
-        } else {
-            content.tint(shellPalette.shellTint(for: colorScheme))
+            return Color(
+                uiColor: TrailhoundTabBarTheme.selectionTintUIColor(
+                    palette: shellPalette,
+                    scheme: colorScheme
+                )
+            )
         }
+        return shellPalette.shellTint(for: colorScheme)
     }
 }
 
@@ -548,11 +555,21 @@ private struct TrailhoundTabContentChrome: ViewModifier {
     @Environment(\.shellPalette) private var shellPalette
 
     func body(content: Content) -> some View {
+        content.tint(chromeTint)
+    }
+
+    /// iOS 26 Light used to skip this modifier. Skipping rebuilt the page and popped
+    /// Settings. The selection tint matches what the tab bar already provides, without the white plate.
+    private var chromeTint: Color {
         if colorScheme == .light, GlassEngineResolver.lightAvoidsWhiteChromeTint {
-            content
-        } else {
-            content.tint(shellPalette.shellTint(for: colorScheme))
+            return Color(
+                uiColor: TrailhoundTabBarTheme.selectionTintUIColor(
+                    palette: shellPalette,
+                    scheme: colorScheme
+                )
+            )
         }
+        return shellPalette.shellTint(for: colorScheme)
     }
 }
 

@@ -279,13 +279,13 @@ private struct FieldKeyboardAccessoryHost: UIViewRepresentable {
     @MainActor
     final class Coordinator {
         let inputView: UIInputView
-        let hosting: UIHostingController<KeyboardAccessoryRoot>
+        let hosting: UIHostingController<KeyboardAccessoryChrome>
         var lastFocusID: AnyHashable?
         private let barHeight = TripDetailKeyboardLayout.accessoryBarHeight
 
         init() {
             hosting = UIHostingController(
-                rootView: KeyboardAccessoryRoot(
+                rootView: KeyboardAccessoryChrome(
                     title: "",
                     onDone: {},
                     shellPalette: .sky,
@@ -315,7 +315,7 @@ private struct FieldKeyboardAccessoryHost: UIViewRepresentable {
             colorScheme: ColorScheme
         ) {
             hosting.overrideUserInterfaceStyle = colorScheme == .dark ? .dark : .light
-            hosting.rootView = KeyboardAccessoryRoot(
+            hosting.rootView = KeyboardAccessoryChrome(
                 title: title,
                 onDone: onDone,
                 shellPalette: shellPalette,
@@ -458,6 +458,24 @@ private extension UIResponder {
             for: nil
         )
         return capturedFirstResponder
+    }
+}
+
+private struct KeyboardAccessoryChrome: View {
+    var title: String
+    var onDone: () -> Void
+    var shellPalette: ShellPalette
+    var colorScheme: ColorScheme
+
+    var body: some View {
+        KeyboardAccessoryRoot(
+            title: title,
+            onDone: onDone,
+            shellPalette: shellPalette,
+            colorScheme: colorScheme
+        )
+        .environment(\.locale, SharedLanguage.locale)
+        .environment(\.dynamicTypeSize, AppTextSize.resolvedFromTraits(AppSettings.shared.textSize))
     }
 }
 
