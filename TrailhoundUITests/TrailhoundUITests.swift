@@ -927,6 +927,30 @@ final class LiveMapPlannedRoutePadUITests: LiveMapPlannedRouteUITestCase {
 
         stopRecording()
     }
+
+    /// The live map keeps its pane; the trip takes the list's pane with its own Back.
+    func testPadTripOpensBesideTheLiveMap() throws {
+        XCTAssertTrue(tripsTab.waitForExistence(timeout: uiTimeout))
+        try XCTSkipUnless(isPad, "iPad layout")
+        XCUIDevice.shared.orientation = .landscapeLeft
+        try openLiveMap()
+
+        let row = app.buttons["trips.row.first"].firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: uiTimeout))
+        row.tap()
+
+        let back = element("recording.paneTrip.back")
+        XCTAssertTrue(back.waitForExistence(timeout: uiTimeout))
+        XCTAssertTrue(back.isHittable, "Back sits on the pane, not under hidden chrome")
+        XCTAssertTrue(element("liveMap.pause").exists, "The live map stays open")
+
+        back.tap()
+        XCTAssertTrue(row.waitForExistence(timeout: uiTimeout))
+        XCTAssertFalse(back.exists)
+        XCTAssertTrue(element("liveMap.pause").exists)
+
+        stopRecording()
+    }
 }
 
 final class JournalCornerCardUITests: TrailhoundUITestCase {

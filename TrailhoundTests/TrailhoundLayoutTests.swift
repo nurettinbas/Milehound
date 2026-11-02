@@ -261,6 +261,61 @@ final class TrailhoundLayoutTests: XCTestCase {
         XCTAssertEqual(openBook.settingsChrome, .split)
     }
 
+    func testRecordingOpensTripsInAPaneOnlyWhereThePaneExists() {
+        let openBook = TrailhoundLayoutResolver.snapshot(
+            horizontal: .regular,
+            vertical: .regular,
+            size: CGSize(width: 1600, height: 1100),
+            idiom: .phone
+        )
+        XCTAssertTrue(openBook.opensTripInPane(whileRecording: false))
+        XCTAssertTrue(openBook.opensTripInPane(whileRecording: true))
+
+        let padLand = TrailhoundLayoutResolver.snapshot(
+            horizontal: .regular,
+            vertical: .regular,
+            size: CGSize(width: 1366, height: 1024),
+            idiom: .pad
+        )
+        XCTAssertTrue(padLand.opensTripInPane(whileRecording: true))
+
+        let padPortrait = TrailhoundLayoutResolver.snapshot(
+            horizontal: .regular,
+            vertical: .regular,
+            size: CGSize(width: 1024, height: 1366),
+            idiom: .pad
+        )
+        XCTAssertTrue(padPortrait.opensTripInPane(whileRecording: true))
+
+        let closedLandscape = TrailhoundLayoutResolver.snapshot(
+            horizontal: .compact,
+            vertical: .compact,
+            size: CGSize(width: 667, height: 375),
+            idiom: .phone
+        )
+        XCTAssertEqual(closedLandscape.layoutClass, .phoneLandscape)
+        XCTAssertTrue(closedLandscape.opensTripInPane(whileRecording: true))
+
+        let upright = TrailhoundLayoutResolver.snapshot(
+            horizontal: .regular,
+            vertical: .regular,
+            size: CGSize(width: 680, height: 1100),
+            idiom: .phone
+        )
+        XCTAssertTrue(upright.pinsRecordingCardToFold)
+        XCTAssertTrue(upright.opensTripInPane(whileRecording: false))
+        XCTAssertFalse(upright.opensTripInPane(whileRecording: true), "No trip pane under the pinned card: push")
+
+        let phone = TrailhoundLayoutResolver.snapshot(
+            horizontal: .compact,
+            vertical: .regular,
+            size: CGSize(width: 390, height: 844),
+            idiom: .phone
+        )
+        XCTAssertFalse(phone.opensTripInPane(whileRecording: false))
+        XCTAssertFalse(phone.opensTripInPane(whileRecording: true))
+    }
+
     func testUprightOpenFoldKeepsSettingsInOneColumn() {
         let upright = TrailhoundLayoutResolver.snapshot(
             horizontal: .regular,

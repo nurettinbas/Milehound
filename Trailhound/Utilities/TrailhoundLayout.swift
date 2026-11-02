@@ -100,6 +100,13 @@ struct TrailhoundLayoutSnapshot: Equatable, Sendable {
 
     var opensTripInPane: Bool { layoutClass != .phone }
 
+    /// The upright fold stacks the recording card over the list and has no trip pane,
+    /// so a trip opened while recording there is pushed instead.
+    func opensTripInPane(whileRecording recording: Bool) -> Bool {
+        guard opensTripInPane else { return false }
+        return !(recording && pinsRecordingCardToFold)
+    }
+
     var embedsTripDetail: Bool { layoutClass != .phone }
 
     var tripDetailStyle: TripDetailStyle {

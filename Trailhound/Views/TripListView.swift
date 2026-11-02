@@ -991,10 +991,13 @@ struct TripListView: View {
         TripDetailView(trip: trip)
             .id(trip.id)
             .environment(\.tripDetailRegion, .stacked)
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("recording.paneTrip")
             .overlay(alignment: .topLeading) {
                 GlassToolbarBackButton {
                     paneTripID = nil
                 }
+                .accessibilityIdentifier("recording.paneTrip.back")
                 .padding(12)
             }
     }
@@ -1755,12 +1758,10 @@ struct TripListView: View {
         }
     }
 
-    /// The upright fold stacks the recording card over the list and has no trip pane,
-    /// so a trip opened while recording there is pushed instead.
     private var tripRowOpensInPane: Bool {
-        guard layout.opensTripInPane else { return false }
-        let recording = recordingService.state.isActiveSession && endCredits == nil
-        return !(recording && layout.pinsRecordingCardToFold)
+        layout.opensTripInPane(
+            whileRecording: recordingService.state.isActiveSession && endCredits == nil
+        )
     }
 
     @ViewBuilder
