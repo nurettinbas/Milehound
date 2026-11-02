@@ -343,6 +343,34 @@ final class TrailhoundUITests: TrailhoundUITestCase {
         XCTAssertTrue(app.descendants(matching: .any)["stats.filters.card"].waitForExistence(timeout: uiTimeout))
     }
 
+    func testTextSizeAndLanguagePages() {
+        XCTAssertTrue(settingsTab.waitForExistence(timeout: uiTimeout))
+        settingsTab.tap()
+
+        let appearance = app.descendants(matching: .any)["settings.appearance"]
+        revealSettingsControl(appearance)
+        XCTAssertTrue(appearance.waitForExistence(timeout: uiTimeout))
+        appearance.tap()
+
+        let large = app.descendants(matching: .any)["settings.textSize.large"]
+        revealSettingsControl(large)
+        XCTAssertTrue(large.waitForExistence(timeout: uiTimeout), "Large text size tile should be on the Appearance page")
+        large.tap()
+
+        let back = app.navigationBars.buttons.element(boundBy: 0)
+        XCTAssertTrue(back.waitForExistence(timeout: uiTimeout))
+        back.tap()
+
+        let language = app.descendants(matching: .any)["settings.language"]
+        revealSettingsControl(language)
+        XCTAssertTrue(language.waitForExistence(timeout: uiTimeout))
+        language.tap()
+
+        XCTAssertTrue(app.descendants(matching: .any)["settings.language.en"].waitForExistence(timeout: uiTimeout))
+        XCTAssertTrue(app.descendants(matching: .any)["settings.language.tr"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["settings.language.system"].exists)
+    }
+
     func testStatsSectionTitlePinsWhileScrolling() {
         XCTAssertTrue(statsTab.waitForExistence(timeout: uiTimeout))
         statsTab.tap()
