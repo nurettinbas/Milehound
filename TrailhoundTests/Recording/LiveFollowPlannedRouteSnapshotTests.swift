@@ -469,6 +469,9 @@ final class LiveFollowPlannedRouteSnapshotTests: XCTestCase {
         .environment(\.colorScheme, scheme)
         .environment(\.layoutDirection, direction)
         .environment(\.dynamicTypeSize, typeSize)
+        // Distance and the arrival clock follow the region. Pin en_TR (24-hour, decimal comma)
+        // so a CI simulator in en_US renders the same open card as these references.
+        .environment(\.locale, Locale(identifier: "en_TR"))
         .environment(\.shellPalette, .sky)
         .frame(width: size.width, height: size.height)
         assertHosted(root, size: size, scheme: scheme, named: name, file: file, testName: testName, line: line)

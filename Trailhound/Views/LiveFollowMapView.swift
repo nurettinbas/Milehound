@@ -1256,6 +1256,7 @@ struct LiveFollowRouteCard: View {
     var action: () -> Void
 
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.locale) private var locale
     @Environment(\.shellPalette) private var shellPalette
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Namespace private var morph
@@ -1276,7 +1277,11 @@ struct LiveFollowRouteCard: View {
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 30)) { _ in
-            let content = LiveFollowRouteChipHost.content(for: plannedRoute, now: plannedRoute.now())
+            let content = LiveFollowRouteChipHost.content(
+                for: plannedRoute,
+                now: plannedRoute.now(),
+                locale: locale
+            )
             let missed = plannedRoute.missedTurn
             let rerouting = plannedRoute.isRerouting
             let maneuver = (missed || rerouting) ? nil : plannedRoute.upcomingManeuver
@@ -1464,7 +1469,7 @@ struct LiveFollowRouteCard: View {
                 bannerRow(
                     String(
                         format: L10n.string("recording.live_map.route.maneuver"),
-                        DateFormatters.formatManeuverDistance(maneuver.distanceMeters),
+                        DateFormatters.formatManeuverDistance(maneuver.distanceMeters, locale: locale),
                         maneuver.instruction
                     ),
                     systemImage: ManeuverIcon.systemImage(for: maneuver.instruction),
@@ -1586,17 +1591,23 @@ struct LiveFollowRouteChipHost: View {
     var plannedRoute: PlannedRouteStore
     var action: () -> Void
 
+    @Environment(\.locale) private var locale
+
     var body: some View {
         TimelineView(.periodic(from: .now, by: 30)) { _ in
             RecordingRouteChip(
-                content: Self.content(for: plannedRoute, now: plannedRoute.now()),
+                content: Self.content(for: plannedRoute, now: plannedRoute.now(), locale: locale),
                 action: action,
                 wide: true
             )
         }
     }
 
-    static func content(for store: PlannedRouteStore, now: Date) -> RecordingRouteChip.Content {
+    static func content(
+        for store: PlannedRouteStore,
+        now: Date,
+        locale: Locale = DateFormatters.currentLocale
+    ) -> RecordingRouteChip.Content {
         guard store.destination != nil else { return .setDestination }
         switch store.status {
         case .idle, .loading:
@@ -1613,9 +1624,9 @@ struct LiveFollowRouteChipHost: View {
                 return .loading
             }
             return .estimate(
-                distance: DateFormatters.formatDistance(meters),
+                distance: DateFormatters.formatDistance(meters, locale: locale),
                 countdown: LiveFollowCountdown.label(seconds: time),
-                arrival: DateFormatters.tripTime.string(from: now.addingTimeInterval(time))
+                arrival: DateFormatters.tripTimeFormatter(locale: locale).string(from: now.addingTimeInterval(time))
             )
         }
     }

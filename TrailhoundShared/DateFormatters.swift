@@ -22,9 +22,9 @@ public enum DateFormatters {
         return formatter
     }
 
-    public static func tripTimeFormatter() -> DateFormatter {
+    public static func tripTimeFormatter(locale: Locale = currentLocale) -> DateFormatter {
         let formatter = DateFormatter()
-        formatter.locale = currentLocale
+        formatter.locale = locale
         formatter.dateStyle = .none
         formatter.timeStyle = .short
         return formatter
@@ -86,20 +86,20 @@ public enum DateFormatters {
     }
 
     /// Turns stay in metres until a kilometre. Trip totals stay in kilometres.
-    public static func formatManeuverDistance(_ meters: Double) -> String {
-        guard meters < 1_000 else { return formatDistance(meters) }
+    public static func formatManeuverDistance(_ meters: Double, locale: Locale = currentLocale) -> String {
+        guard meters < 1_000 else { return formatDistance(meters, locale: locale) }
         let formatter = MeasurementFormatter()
-        formatter.locale = currentLocale
+        formatter.locale = locale
         formatter.unitOptions = .providedUnit
         formatter.unitStyle = .short
         formatter.numberFormatter.maximumFractionDigits = 0
         return formatter.string(from: Measurement(value: meters, unit: UnitLength.meters))
     }
 
-    public static func formatDistance(_ meters: Double) -> String {
+    public static func formatDistance(_ meters: Double, locale: Locale = currentLocale) -> String {
         let kilometers = meters / 1000
         let formatter = MeasurementFormatter()
-        formatter.locale = currentLocale
+        formatter.locale = locale
         formatter.unitOptions = .providedUnit
         formatter.numberFormatter.maximumFractionDigits = 1
         formatter.numberFormatter.minimumFractionDigits = kilometers >= 10 ? 0 : 1

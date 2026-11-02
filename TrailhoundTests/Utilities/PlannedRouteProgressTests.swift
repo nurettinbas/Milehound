@@ -409,6 +409,29 @@ final class LiveFollowRouteChipContentTests: XCTestCase {
         XCTAssertEqual(LiveFollowRouteChipHost.content(for: failed, now: now), .failed)
     }
 
+    func testEstimateFollowsThePassedRegion() async {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let route = DrivingRoute(
+            coordinates: [origin, destination.coordinate],
+            distanceMeters: 12_400,
+            expectedTravelTime: 1_080
+        )
+        let ready = store(.success(route))
+        ready.setDestination(destination, origin: origin)
+        await ready.requestTask?.value
+
+        let turkey = LiveFollowRouteChipHost.content(for: ready, now: now, locale: Locale(identifier: "en_TR"))
+        let unitedStates = LiveFollowRouteChipHost.content(for: ready, now: now, locale: Locale(identifier: "en_US"))
+        guard case let .estimate(distanceTR, _, arrivalTR) = turkey,
+              case let .estimate(distanceUS, _, arrivalUS) = unitedStates else {
+            return XCTFail("Expected an estimate in both regions")
+        }
+        XCTAssertTrue(distanceTR.contains(","))
+        XCTAssertTrue(distanceUS.contains("."))
+        XCTAssertFalse(arrivalTR.contains("M"))
+        XCTAssertTrue(arrivalUS.contains("M"))
+    }
+
     func testUpcomingManeuverNamesTheNextSpokenStep() {
         let steps = [
             RouteStep(instruction: "Head north", distanceMeters: 400),
