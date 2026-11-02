@@ -469,6 +469,21 @@ enum TrailhoundLayoutResolver {
         return .phone
     }
 
+    /// The key window, not a 390×844 stand-in. An open Duo's first SwiftUI pass
+    /// often reports a phone-sized content rect; the window bounds are the fold.
+    @MainActor
+    static func currentWindowSize(fallback: CGSize) -> CGSize {
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        for scene in scenes {
+            let windows = scene.windows
+            if let window = windows.first(where: \.isKeyWindow) ?? windows.first {
+                let bounds = window.bounds.size
+                if bounds.width > 1, bounds.height > 1 { return bounds }
+            }
+        }
+        return fallback
+    }
+
     static func snapshot(
         horizontal: UserInterfaceSizeClass?,
         vertical: UserInterfaceSizeClass?,
@@ -713,10 +728,21 @@ private struct TripDetailRegionKey: EnvironmentKey {
     static let defaultValue = TripDetailRegion.automatic
 }
 
+private struct FoldPaneHeaderBottomKey: EnvironmentKey {
+    static let defaultValue: CGFloat = 0
+}
+
 extension EnvironmentValues {
     var trailhoundLayout: TrailhoundLayoutSnapshot {
         get { self[TrailhoundLayoutKey.self] }
         set { self[TrailhoundLayoutKey.self] = newValue }
+    }
+
+    /// Bottom of the title bar, in the coordinates of a fold pane that bleeds up to the window top.
+    /// Zero when the pane does not bleed.
+    var foldPaneHeaderBottom: CGFloat {
+        get { self[FoldPaneHeaderBottomKey.self] }
+        set { self[FoldPaneHeaderBottomKey.self] = newValue }
     }
 
     var tripDetailRegion: TripDetailRegion {
@@ -1106,7 +1132,8 @@ enum RecordingAxisPlacement {
         contentInWindow: CGRect,
         windowSize: CGSize,
         evenSplit: Bool = false,
-        forceSideBySide: Bool = false
+        forceSideBySide: Bool = false,
+        forceStacked: Bool = false
     ) -> Frames {
         let width = bounds.width
         let height = bounds.height
@@ -1114,7 +1141,13 @@ enum RecordingAxisPlacement {
             return Frames(live: bounds, list: bounds)
         }
         let gap = max(0, gutter)
-        let travel = forceSideBySide ? 0 : stackAmount(width: width, height: height)
+        let travel: CGFloat = if forceSideBySide {
+            0
+        } else if forceStacked {
+            1
+        } else {
+            stackAmount(width: width, height: height)
+        }
         let landscape = landscapeFrames(
             in: bounds,
             gap: gap,
@@ -1234,6 +1267,9 @@ struct RecordingAxisLayout: Layout {
     var evenSplit: Bool
     /// iPad portrait stays two columns. A tall window must not stack the card across the screen.
     var forceSideBySide: Bool = false
+    /// Settled upright fold. A tall top safe area shortens the pane below the
+    /// stacking ratio, and the blend then shifts the card left and the list right.
+    var forceStacked: Bool = false
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
         proposal.replacingUnspecifiedDimensions()
@@ -1249,7 +1285,8 @@ struct RecordingAxisLayout: Layout {
             contentInWindow: contentInWindow,
             windowSize: windowSize,
             evenSplit: evenSplit,
-            forceSideBySide: forceSideBySide
+            forceSideBySide: forceSideBySide,
+            forceStacked: forceStacked
         )
         subviews[0].place(
             at: frames.live.origin,
@@ -1283,7 +1320,9 @@ struct RecordingOrientationStage<Live: View, List: View>: View {
             contentInWindow: contentInWindow,
             windowSize: measuredWindow,
             evenSplit: layout.isPhoneBook,
-            forceSideBySide: layout.layoutClass == .pad
+            forceSideBySide: layout.layoutClass == .pad,
+            forceStacked: layout.pinsRecordingCardToFold
+                && !TrailhoundInterfaceRotation.shared.isRotating
         ) {
             live()
                 .clipped()
@@ -1656,8 +1695,10 @@ struct TrailhoundFoldStack<Top: View, Bottom: View>: View {
     @ViewBuilder var top: () -> Top
     @ViewBuilder var bottom: () -> Bottom
 
+    @Environment(\.trailhoundLayout) private var layout
     @State private var contentInWindow: CGRect = .zero
     @State private var measuredWindowHeight: CGFloat = 0
+    @State private var safeTop: CGFloat = 0
 
     var body: some View {
         VStack(spacing: gutter) {
@@ -1670,6 +1711,13 @@ struct TrailhoundFoldStack<Top: View, Bottom: View>: View {
         .background {
             AtmosphericBackground()
                 .ignoresSafeArea()
+            GeometryReader { geo in
+                Color.clear
+                    .onAppear { safeTop = geo.safeAreaInsets.top }
+                    .onChange(of: geo.safeAreaInsets.top) { _, top in
+                        safeTop = top
+                    }
+            }
             TrailhoundWindowFrameReader { frame, windowSize in
                 guard frame != contentInWindow || windowSize.height != measuredWindowHeight else { return }
                 contentInWindow = frame
@@ -1681,6 +1729,7 @@ struct TrailhoundFoldStack<Top: View, Bottom: View>: View {
     private var topPane: some View {
         let bleed = topFillsToEdge ? max(0, contentInWindow.minY) : 0
         let framed = top()
+            .environment(\.foldPaneHeaderBottom, bleed)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
             .frame(height: topHeight.map { $0 + bleed })
             .padding(.top, -bleed)
@@ -1693,9 +1742,21 @@ struct TrailhoundFoldStack<Top: View, Bottom: View>: View {
         }
     }
 
+    /// The fold's top in the window. A missing nav-bar inset reports a tiny minY
+    /// while the title still occupies `safeTop`, which parks the card under the title.
+    private var contentTop: CGFloat {
+        max(contentInWindow.minY, safeTop)
+    }
+
     /// Layout height from the content top to the hinge. `topFillsToEdge` adds the
     /// top bleed back in the frame, then pulls it up, so the bottom stays on the fold.
     private var topHeight: CGFloat? {
+        if let measured = measuredTopHeight { return measured }
+        guard layout.pinsRecordingCardToFold, layout.size.height > 1 else { return nil }
+        return max(1, layout.size.height / 2 - gutter / 2)
+    }
+
+    private var measuredTopHeight: CGFloat? {
         let contentHeight = contentInWindow.height
         let windowHeight = measuredWindowHeight
         guard contentHeight > 1, windowHeight > 1 else { return nil }
@@ -1704,7 +1765,7 @@ struct TrailhoundFoldStack<Top: View, Bottom: View>: View {
             return height > 1 ? height : nil
         }
         return TrailhoundLayoutResolver.duoLeadingPaneWidth(
-            contentOriginX: contentInWindow.minY,
+            contentOriginX: contentTop,
             contentWidth: contentHeight,
             windowWidth: windowHeight,
             gutter: gutter,

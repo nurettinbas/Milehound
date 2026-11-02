@@ -94,6 +94,8 @@ enum PlannedRouteProgress {
     static let missedTurnMinSpeed: CLLocationSpeed = 4
     /// MapKit directions are throttled. A further miss waits this long, not half a minute.
     static let rerouteInterval: TimeInterval = 8
+    /// Quiet refresh while still on the road, so a longer drive from traffic can replace the countdown.
+    static let trafficRefresh: TimeInterval = 180
     /// Inside this radius the trip has reached the destination and the route clears.
     static let arrivalMeters: CLLocationDistance = 50
 
@@ -257,9 +259,9 @@ enum PlannedRouteProgress {
         )
     }
 
-    static func canRequest(lastRequestAt: Date?, now: Date) -> Bool {
+    static func canRequest(lastRequestAt: Date?, now: Date, interval: TimeInterval = rerouteInterval) -> Bool {
         guard let lastRequestAt else { return true }
-        return now.timeIntervalSince(lastRequestAt) >= rerouteInterval
+        return now.timeIntervalSince(lastRequestAt) >= interval
     }
 
     static func hasArrived(

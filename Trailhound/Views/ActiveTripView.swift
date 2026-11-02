@@ -473,7 +473,8 @@ struct ActiveTripView: View {
             systemImage: VehicleIconOption.default.rawValue,
             vehiclePhoto: roadVehiclePhoto,
             symbolScaleX: -1,
-            allowsVerticalBounce: true
+            allowsVerticalBounce: true,
+            showsLaneLines: false
         ) { carLayout in
             if let serviceDue = urgentServiceDue {
                 RecordingVehicleServiceBadge(

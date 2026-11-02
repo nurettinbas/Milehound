@@ -29,6 +29,7 @@ struct LiveFollowMapView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.shellPalette) private var shellPalette
     @Environment(\.trailhoundLayout) private var layout
+    @Environment(\.foldPaneHeaderBottom) private var foldHeaderBottom
     @Environment(\.layoutDirection) private var layoutDirection
     @Bindable private var settings = AppSettings.shared
 
@@ -67,6 +68,7 @@ struct LiveFollowMapView: View {
     /// cannot vanish if the live array is briefly empty.
     @State private var latchedStartCoordinate: CLLocationCoordinate2D?
     @State private var showsDestinationSheet = false
+    @State private var routeCardCollapsed = false
     @Namespace private var destinationZoom
     @Environment(\.modelContext) private var modelContext
 
@@ -332,7 +334,14 @@ struct LiveFollowMapView: View {
             max(topInset, 22)
         }
         let cardLeading = (landscapeDuoCover ? 10 : leadingInset) + 52
-        let cardTop = coverCameraLeads ? max(topInset, 32) : backTop
+        // The title bar can sit below the safe top, and Back is in that bar.
+        let cardTop: CGFloat = if coverCameraLeads {
+            max(topInset, 32)
+        } else if placesBackInHeader {
+            max(backTop, foldHeaderBottom + 8)
+        } else {
+            backTop
+        }
         return ZStack(alignment: .topLeading) {
             VStack(spacing: 0) {
             topChrome(gpsClearance: gpsClearance, showsBack: !landscapeDuoCover && !placesBackInHeader)
@@ -397,7 +406,7 @@ struct LiveFollowMapView: View {
         }
     }
 
-    /// Portrait cover: 10% shorter than the gap between Back and the camera, centered in that gap.
+    /// Portrait cover: 19% shorter than the gap between Back and the camera, centered in that gap.
     private struct PortraitCoverDestinationCenter: ViewModifier {
         var leading: CGFloat
         var camera: CGFloat
@@ -448,7 +457,11 @@ struct LiveFollowMapView: View {
     /// Closed landscape cover: the card sits on the trailing side, its right edge on Stop’s inset.
     @ViewBuilder
     private func destinationCard(top: CGFloat, leading: CGFloat, trailing: CGFloat) -> some View {
-        let card = LiveFollowRouteCard(plannedRoute: recordingService.plannedRoute) {
+        let card = LiveFollowRouteCard(
+            plannedRoute: recordingService.plannedRoute,
+            isCollapsed: $routeCardCollapsed,
+            collapsedAlignment: landscapeDuoCover ? .trailing : .leading
+        ) {
             setDestinationSheet(true)
         }
         .glassSheetZoomSource(id: LiveFollowDestinationSheet.zoomID, in: destinationZoom)
@@ -467,7 +480,7 @@ struct LiveFollowMapView: View {
                     PortraitCoverDestinationCenter(
                         leading: leading,
                         camera: 92,
-                        fraction: 0.9
+                        fraction: 0.81
                     )
                 )
                 .padding(.top, top)
@@ -1228,19 +1241,27 @@ private struct LiveFollowNavChevron: Shape {
     }
 }
 
-/// Marks the destination sheet's present and dismiss. The live map cover turns animations off
-/// for everything else, which would make the sheet pop in instead of zooming out of the chip.
+/// Marks the destination sheet's present and dismiss, and the route card's collapse. The live map
+/// cover turns animations off for everything else, which would make them pop instead of moving.
 struct LiveFollowSheetTransition: TransactionKey {
     static let defaultValue = false
 }
 
-/// One plate: the next turn on top, the destination row underneath. The row is the button.
+/// One plate: the destination row on top, the next turn underneath. The row is the button.
+/// Collapsed, the plate shrinks into one glass circle so the whole map shows; a tap widens it back.
 struct LiveFollowRouteCard: View {
     var plannedRoute: PlannedRouteStore
+    @Binding var isCollapsed: Bool
+    /// Where the circle rests inside the card's slot.
+    var collapsedAlignment: Alignment = .leading
     var action: () -> Void
 
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.shellPalette) private var shellPalette
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Namespace private var morph
+
+    private static let morphID = "liveMap.routeCard"
 
     private var shape: RoundedRectangle {
         RoundedRectangle(cornerRadius: 16, style: .continuous)
@@ -1255,13 +1276,35 @@ struct LiveFollowRouteCard: View {
     private var heightScale: CGFloat { 1.25 }
 
     var body: some View {
-        TimelineView(.everyMinute) { context in
+        TimelineView(.periodic(from: .now, by: 30)) { context in
             let content = LiveFollowRouteChipHost.content(for: plannedRoute, now: context.date)
             let missed = plannedRoute.missedTurn
             let rerouting = plannedRoute.isRerouting
             let maneuver = (missed || rerouting) ? nil : plannedRoute.upcomingManeuver
-            let showsBanner = missed || rerouting || maneuver != nil
-            VStack(spacing: 0) {
+            ZStack(alignment: collapsedAlignment) {
+                if isCollapsed {
+                    collapsedButton(content: content, missed: missed, rerouting: rerouting, maneuver: maneuver)
+                        .matchedGeometryEffect(id: Self.morphID, in: morph)
+                        .transition(.opacity)
+                } else {
+                    expandedCard(content: content, missed: missed, rerouting: rerouting, maneuver: maneuver)
+                        .matchedGeometryEffect(id: Self.morphID, in: morph)
+                        .transition(.opacity)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: collapsedAlignment)
+        }
+    }
+
+    private func expandedCard(
+        content: RecordingRouteChip.Content,
+        missed: Bool,
+        rerouting: Bool,
+        maneuver: UpcomingManeuver?
+    ) -> some View {
+        let showsBanner = missed || rerouting || maneuver != nil
+        return VStack(spacing: 0) {
+            HStack(spacing: 6 * heightScale) {
                 RecordingRouteChip(
                     content: content,
                     action: action,
@@ -1269,23 +1312,131 @@ struct LiveFollowRouteCard: View {
                     embedded: true,
                     heightScale: heightScale
                 )
-                .padding(.horizontal, 8 * heightScale)
-                .padding(.top, 8 * heightScale)
-                .padding(.bottom, showsBanner ? 6 * heightScale : 8 * heightScale)
-                if showsBanner {
-                    Rectangle()
-                        .fill(Color.white.opacity(colorScheme == .dark ? 0.16 : 0.35))
-                        .frame(height: 0.5)
-                        .padding(.horizontal, 12)
-                    banner(missed: missed, rerouting: rerouting, maneuver: maneuver)
-                        .padding(.horizontal, 10 * heightScale)
-                        .padding(.top, 6 * heightScale)
-                        .padding(.bottom, 8 * heightScale)
+                .frame(maxWidth: .infinity)
+                Button {
+                    setCollapsed(true)
+                } label: {
+                    Image(systemName: "arrow.down.right.and.arrow.up.left")
+                        .font(.system(size: 11 * heightScale, weight: .bold))
+                        .foregroundStyle(Color.white)
+                        .frame(width: Self.collapseSide, height: Self.collapseSide)
+                        .background { TrailhoundTintCapsule() }
+                        .contentShape(Circle())
                 }
+                .buttonStyle(.glassPlainHit)
+                .accessibilityLabel(L10n.string("recording.live_map.route.hide"))
+                .accessibilityIdentifier("liveMap.route.collapse")
             }
-            .frame(maxWidth: .infinity)
-            .clipShape(shape)
-            .liveMapHUDPlate(shape)
+            .padding(.horizontal, 8 * heightScale)
+            .padding(.top, 8 * heightScale)
+            .padding(.bottom, showsBanner ? 6 * heightScale : 8 * heightScale)
+            if showsBanner {
+                Rectangle()
+                    .fill(Color.white.opacity(colorScheme == .dark ? 0.16 : 0.35))
+                    .frame(height: 0.5)
+                    .padding(.horizontal, 12)
+                banner(missed: missed, rerouting: rerouting, maneuver: maneuver)
+                    .padding(.horizontal, 10 * heightScale)
+                    .padding(.top, 6 * heightScale)
+                    .padding(.bottom, 8 * heightScale)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .clipShape(shape)
+        .liveMapHUDPlate(shape)
+    }
+
+    /// Same tint disc as the destination row, inside one HUD glass plate. The glyph is the card's state.
+    /// With an estimate the plate is a chip: the red minutes left and the distance. Otherwise a circle.
+    private func collapsedButton(
+        content: RecordingRouteChip.Content,
+        missed: Bool,
+        rerouting: Bool,
+        maneuver: UpcomingManeuver?
+    ) -> some View {
+        let side = GlassTokens.toolbarControlCircleSide
+        let disc = ZStack {
+            TrailhoundTintCapsule()
+                .frame(width: Self.collapsedDiscSide, height: Self.collapsedDiscSide)
+            if rerouting || content == .loading {
+                ProgressView()
+                    .controlSize(.small)
+                    .tint(Color.white)
+            } else {
+                Image(systemName: collapsedSymbol(content: content, missed: missed, maneuver: maneuver))
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(Color.white)
+            }
+        }
+        return Button {
+            setCollapsed(false)
+        } label: {
+            if case let .estimate(distance, countdown, _) = content {
+                HStack(spacing: 8) {
+                    disc
+                    HStack(spacing: 0) {
+                        Text(countdown)
+                            .foregroundStyle(RecordingRouteChip.countdownInk)
+                        Text(" · \(distance)")
+                            .foregroundStyle(bannerInk)
+                    }
+                    .font(.system(size: 14, weight: .bold))
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .fixedSize()
+                }
+                .padding(.leading, (side - Self.collapsedDiscSide) / 2)
+                .padding(.trailing, 14)
+                .frame(height: side)
+                .contentShape(Capsule())
+                .liveMapHUDPlate(Capsule(), interactive: true)
+            } else {
+                disc
+                    .frame(width: side, height: side)
+                    .contentShape(Circle())
+                    .liveMapHUDPlate(Circle(), interactive: true)
+            }
+        }
+        .buttonStyle(.glassPlainHit)
+        .accessibilityLabel(L10n.string("recording.live_map.route.show"))
+        .accessibilityValue(collapsedAccessibilityValue(content))
+        .accessibilityIdentifier("liveMap.route.expand")
+    }
+
+    private func collapsedAccessibilityValue(_ content: RecordingRouteChip.Content) -> String {
+        guard case let .estimate(distance, countdown, _) = content else { return "" }
+        return "\(countdown), \(distance)"
+    }
+
+    private func collapsedSymbol(
+        content: RecordingRouteChip.Content,
+        missed: Bool,
+        maneuver: UpcomingManeuver?
+    ) -> String {
+        if missed { return "arrow.turn.up.right" }
+        if let maneuver { return ManeuverIcon.systemImage(for: maneuver.instruction) }
+        switch content {
+        case .setDestination: return "flag.fill"
+        case .offline: return "wifi.slash"
+        case .failed: return "exclamationmark.triangle.fill"
+        case .loading, .estimate: return "flag.checkered"
+        }
+    }
+
+    private static let collapseSide: CGFloat = 30
+    private static let collapsedDiscSide: CGFloat = 34
+
+    /// The live map turns animations off; this flag lets the morph through.
+    private func setCollapsed(_ collapsed: Bool) {
+        TrailhoundHaptics.selection()
+        var transaction = Transaction(
+            animation: reduceMotion
+                ? nil
+                : (collapsed ? TrailhoundMotion.liveMapHintCollapse : TrailhoundMotion.liveMapHintPop)
+        )
+        transaction[LiveFollowSheetTransition.self] = true
+        withTransaction(transaction) {
+            isCollapsed = collapsed
         }
     }
 
@@ -1435,7 +1586,7 @@ struct LiveFollowRouteChipHost: View {
     var action: () -> Void
 
     var body: some View {
-        TimelineView(.everyMinute) { context in
+        TimelineView(.periodic(from: .now, by: 30)) { context in
             RecordingRouteChip(
                 content: Self.content(for: plannedRoute, now: context.date),
                 action: action,
@@ -1454,14 +1605,34 @@ struct LiveFollowRouteChipHost: View {
         case .failed:
             return .failed
         case .ready:
-            guard let meters = store.remainingMeters, let time = store.remainingTravelTime else {
+            if store.showsRecalculatingETA {
+                return .loading
+            }
+            guard let meters = store.remainingMeters, let time = store.displayedRemaining(at: now) else {
                 return .loading
             }
             return .estimate(
                 distance: DateFormatters.formatDistance(meters),
+                countdown: LiveFollowCountdown.label(seconds: time),
                 arrival: DateFormatters.tripTime.string(from: now.addingTimeInterval(time))
             )
         }
+    }
+}
+
+/// Remaining minutes on the destination button. Whole minutes, at least one while any time is left.
+enum LiveFollowCountdown {
+    static func label(seconds: TimeInterval) -> String {
+        let minutes = max(seconds > 0 ? 1 : 0, Int((seconds / 60).rounded()))
+        if minutes < 60 {
+            return String(format: L10n.string("recording.live_map.route.minutes"), minutes)
+        }
+        let hours = minutes / 60
+        let remain = minutes % 60
+        if remain == 0 {
+            return String(format: L10n.string("recording.live_map.route.hours"), hours)
+        }
+        return String(format: L10n.string("recording.live_map.route.hours_minutes"), hours, remain)
     }
 }
 

@@ -394,6 +394,7 @@ final class LiveFollowRouteChipContentTests: XCTestCase {
             LiveFollowRouteChipHost.content(for: ready, now: now),
             .estimate(
                 distance: DateFormatters.formatDistance(1_200),
+                countdown: LiveFollowCountdown.label(seconds: 600),
                 arrival: DateFormatters.tripTime.string(from: now.addingTimeInterval(600))
             )
         )

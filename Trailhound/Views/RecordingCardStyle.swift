@@ -191,15 +191,18 @@ extension View {
 }
 
 /// Live-map route chip. Same frozen plate and ink as the rest of the live-map HUD.
-/// No destination: "Destination". Otherwise remaining distance and estimated arrival, or the route state.
+/// No destination: "Destination". Otherwise remaining distance and a red minute countdown, or the route state.
 struct RecordingRouteChip: View {
     enum Content: Equatable {
         case setDestination
         case loading
         case offline
         case failed
-        case estimate(distance: String, arrival: String)
+        case estimate(distance: String, countdown: String, arrival: String)
     }
+
+    /// Remaining minutes on the destination row and the collapsed route chip.
+    static let countdownInk = Color(red: 1, green: 0.32, blue: 0.32)
 
     let content: Content
     let action: () -> Void
@@ -233,12 +236,7 @@ struct RecordingRouteChip: View {
         } label: {
             HStack(spacing: embedded ? 6 : 4) {
                 leading
-                Text(title)
-                    .font(.system(size: 12 * heightScale, weight: .bold))
-                    .monospacedDigit()
-                    .foregroundStyle(rowInk)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+                titleLabel
                 if embedded {
                     Image(systemName: "chevron.right")
                         .font(.system(size: 11 * heightScale, weight: .bold))
@@ -306,14 +304,47 @@ struct RecordingRouteChip: View {
             return L10n.string("recording.live_map.route.offline")
         case .failed:
             return L10n.string("recording.live_map.route.failed")
-        case let .estimate(distance, arrival):
-            return String(format: L10n.string("recording.live_map.route.eta"), distance, arrival)
+        case let .estimate(distance, countdown, arrival):
+            return String(format: L10n.string("recording.live_map.route.eta"), distance, "\(countdown) · ~\(arrival)")
+        }
+    }
+
+    /// Distance and the arrival clock stay the row ink. The remaining minutes are red.
+    @ViewBuilder
+    private var titleLabel: some View {
+        if case let .estimate(distance, countdown, arrival) = content {
+            HStack(spacing: 0) {
+                Text(distance)
+                    .foregroundStyle(rowInk)
+                Text(" · ")
+                    .foregroundStyle(rowInk)
+                Text(countdown)
+                    .foregroundStyle(Self.countdownInk)
+                Text(" · ~\(arrival)")
+                    .foregroundStyle(rowInk)
+            }
+            .font(.system(size: 12 * heightScale, weight: .bold))
+            .monospacedDigit()
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
+        } else {
+            Text(title)
+                .font(.system(size: 12 * heightScale, weight: .bold))
+                .monospacedDigit()
+                .foregroundStyle(rowInk)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
         }
     }
 
     private var accessibilityText: String {
-        if case let .estimate(distance, arrival) = content {
-            return String(format: L10n.string("recording.live_map.route.eta.accessibility"), distance, arrival)
+        if case let .estimate(distance, countdown, arrival) = content {
+            return String(
+                format: L10n.string("recording.live_map.route.eta.accessibility"),
+                distance,
+                countdown,
+                arrival
+            )
         }
         return title
     }

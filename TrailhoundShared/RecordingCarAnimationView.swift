@@ -109,6 +109,8 @@ struct RecordingCarAnimationView<CarOverlay: View>: View {
     var symbolScaleX: CGFloat = -1
     /// Compact notification / list cards skip the sin bounce (avoids pause/resume bounce-in/out).
     var allowsVerticalBounce: Bool = true
+    /// The road's white top edge and lane dashes. The in-app recording card leaves them off.
+    var showsLaneLines: Bool = true
     @ViewBuilder var carOverlay: (TrailhoundRoadSceneLayout) -> CarOverlay
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -144,6 +146,7 @@ struct RecordingCarAnimationView<CarOverlay: View>: View {
             vehiclePhoto: vehiclePhoto,
             symbolScaleX: symbolScaleX,
             allowsVerticalBounce: allowsVerticalBounce,
+            showsLaneLines: showsLaneLines,
             carOverlay: carOverlay
         )
         .id(markIdentity)
@@ -342,6 +345,7 @@ struct TrailhoundRoadDrivingScene<Overlay: View>: View {
     /// Symbol horizontal scale so the vehicle faces right (`-1` for left-facing SF side cars).
     var symbolScaleX: CGFloat = -1
     var allowsVerticalBounce: Bool = true
+    var showsLaneLines: Bool = true
     /// Atmosphere car / dash / smoke accent. Nil keeps the legacy sky brand blue.
     var accentColor: Color? = nil
     @ViewBuilder var overlay: (_ layout: TrailhoundRoadSceneLayout) -> Overlay
@@ -397,12 +401,14 @@ struct TrailhoundRoadDrivingScene<Overlay: View>: View {
                 if palette == .recording {
                     roadSurface(width: width, roadHeight: roadHeight)
                 }
-                laneMarkings(
-                    width: width,
-                    roadHeight: roadHeight,
-                    carCenterX: carCenterX,
-                    carSize: placement.size
-                )
+                if showsLaneLines {
+                    laneMarkings(
+                        width: width,
+                        roadHeight: roadHeight,
+                        carCenterX: carCenterX,
+                        carSize: placement.size
+                    )
+                }
                 exhaustSmoke(
                     originX: carCenterX - placement.size * 0.48,
                     originY: placement.centerY + placement.size * 0.08,
@@ -438,9 +444,11 @@ struct TrailhoundRoadDrivingScene<Overlay: View>: View {
             .frame(height: roadHeight)
             .frame(maxWidth: .infinity)
             .overlay(alignment: .top) {
-                Rectangle()
-                    .fill(Color.white.opacity(isPaused ? 0.2 : 0.35))
-                    .frame(height: 2)
+                if showsLaneLines {
+                    Rectangle()
+                        .fill(Color.white.opacity(isPaused ? 0.2 : 0.35))
+                        .frame(height: 2)
+                }
             }
     }
 
@@ -656,6 +664,7 @@ private struct RoadSceneDriver<CarOverlay: View>: View {
     var vehiclePhoto: UIImage? = nil
     var symbolScaleX: CGFloat = -1
     var allowsVerticalBounce: Bool = true
+    var showsLaneLines: Bool = true
     @ViewBuilder var carOverlay: (TrailhoundRoadSceneLayout) -> CarOverlay
 
     @State private var frozenRoadTime: TimeInterval = Date.timeIntervalSinceReferenceDate
@@ -691,6 +700,7 @@ private struct RoadSceneDriver<CarOverlay: View>: View {
             vehicleMarkKind: resolvedMarkKind,
             symbolScaleX: symbolScaleX,
             allowsVerticalBounce: allowsVerticalBounce,
+            showsLaneLines: showsLaneLines,
             overlay: carOverlay
         )
         .frame(height: TrailhoundRoadVehicleMarkLayout.sceneFrameHeight(for: metrics))

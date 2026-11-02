@@ -167,7 +167,7 @@ final class LiveFollowPlannedRouteSnapshotTests: XCTestCase {
             ("loading", .loading),
             ("offline", .offline),
             ("failed", .failed),
-            ("estimate", .estimate(distance: "12.4 km", arrival: "14:35")),
+            ("estimate", .estimate(distance: "12.4 km", countdown: "18 min", arrival: "14:35")),
         ]
         let variants: [(String, ColorScheme, LayoutDirection, DynamicTypeSize, CGSize)] = [
             ("light", .light, .leftToRight, .large, CGSize(width: 320, height: 300)),
@@ -276,7 +276,7 @@ final class LiveFollowPlannedRouteSnapshotTests: XCTestCase {
                 onRecenter: {}
             ) {
                 RecordingRouteChip(
-                    content: .estimate(distance: "12.4 km", arrival: "19:36"),
+                    content: .estimate(distance: "12.4 km", countdown: "18 min", arrival: "19:36"),
                     action: {},
                     wide: true
                 )

@@ -117,6 +117,8 @@ final class PlannedRouteStore {
     /// Rounded to 10 m so a 1 Hz fix does not re-render the chip for sub-step changes.
     private(set) var remainingMeters: CLLocationDistance?
     private(set) var remainingTravelTime: TimeInterval?
+    /// True for a moment after the estimate jumps up, so the chip says it is calculating.
+    private(set) var showsRecalculatingETA = false
     /// The car left the planned road. Cleared once a fix is back on the line.
     private(set) var missedTurn = false
     /// A replacement route is in flight after a miss. The previous line stays up meanwhile.
@@ -138,6 +140,9 @@ final class PlannedRouteStore {
     @ObservationIgnored private var lastRequestAt: Date?
     @ObservationIgnored private var generation = 0
     @ObservationIgnored private var lastVehicle: CLLocationCoordinate2D?
+    /// When `remainingTravelTime` was last written. The chip counts down from there between fixes.
+    @ObservationIgnored private var etaAnchoredAt: Date?
+    @ObservationIgnored private var etaRecalcTask: Task<Void, Never>?
 
     var hasDestination: Bool { destination != nil }
 
@@ -161,6 +166,9 @@ final class PlannedRouteStore {
         cumulative = []
         remainingMeters = nil
         remainingTravelTime = nil
+        etaAnchoredAt = nil
+        showsRecalculatingETA = false
+        etaRecalcTask?.cancel()
         upcomingManeuver = nil
         offRouteStreak = 0
         reroutedThisDeparture = false
@@ -184,6 +192,9 @@ final class PlannedRouteStore {
         cumulative = []
         remainingMeters = nil
         remainingTravelTime = nil
+        etaAnchoredAt = nil
+        showsRecalculatingETA = false
+        etaRecalcTask?.cancel()
         upcomingManeuver = nil
         offRouteStreak = 0
         reroutedThisDeparture = false
@@ -245,7 +256,10 @@ final class PlannedRouteStore {
         if confirmed {
             missedTurn = true
         }
-        guard requestTask == nil, confirmed else { return }
+        guard requestTask == nil, confirmed else {
+            refreshForTraffic(from: vehicle)
+            return
+        }
         // The first miss of this departure recalculates immediately. The route that was
         // just fetched does not count, so a turn missed a few seconds into the drive is
         // not held back by that request. A further miss waits out the short throttle.
@@ -258,6 +272,35 @@ final class PlannedRouteStore {
         }
         reroutedThisDeparture = true
         request(from: vehicle, reroute: true)
+    }
+
+    /// Minutes still to drive, counting down from the last estimate until the next one.
+    func displayedRemaining(at now: Date) -> TimeInterval? {
+        guard let remainingTravelTime else { return nil }
+        let elapsed = etaAnchoredAt.map { max(0, now.timeIntervalSince($0)) } ?? 0
+        return max(0, remainingTravelTime - elapsed)
+    }
+
+    /// The new estimate is at least a minute longer. The chip says it is calculating, then shows the minutes.
+    private func noteETAIncreased() {
+        showsRecalculatingETA = true
+        etaRecalcTask?.cancel()
+        etaRecalcTask = Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(900))
+            guard !Task.isCancelled else { return }
+            showsRecalculatingETA = false
+        }
+    }
+
+    /// A new route while still on the road. A longer result flashes “calculating”, then the new minutes.
+    private func refreshForTraffic(from vehicle: CLLocationCoordinate2D) {
+        guard route != nil, requestTask == nil, !missedTurn, !isRerouting else { return }
+        guard PlannedRouteProgress.canRequest(
+            lastRequestAt: lastRequestAt,
+            now: now(),
+            interval: PlannedRouteProgress.trafficRefresh
+        ) else { return }
+        request(from: vehicle)
     }
 
     private func request(from origin: CLLocationCoordinate2D, reroute: Bool = false) {
@@ -351,7 +394,13 @@ final class PlannedRouteStore {
         )
         let roundedTime = (time / 30).rounded() * 30
         if remainingTravelTime != roundedTime {
+            let showing = displayedRemaining(at: now()) ?? 0
+            let jumped = remainingTravelTime != nil && roundedTime >= showing + 60
             remainingTravelTime = roundedTime
+            etaAnchoredAt = now()
+            if jumped {
+                noteETAIncreased()
+            }
         }
         let traveled = max(0, route.distanceMeters - roadMeters)
         let next = PlannedRouteProgress.upcomingManeuver(traveledMeters: traveled, steps: route.steps)
