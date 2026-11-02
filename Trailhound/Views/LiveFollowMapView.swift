@@ -170,7 +170,8 @@ struct LiveFollowMapView: View {
                         bottomInset: bottomInset,
                         leadingInset: leadingChromeInset(safe: safe),
                         hudLeadingInset: hudLeadingInset(safe: safe),
-                        gpsClearance: gpsCameraClearance(safe: safe)
+                        gpsClearance: gpsCameraClearance(safe: safe),
+                        controlLift: duoCoverControlLift(safe: safe)
                     )
 
                     CardExpandBackSwipeStrip(
@@ -259,6 +260,20 @@ struct LiveFollowMapView: View {
         }
         .accessibilityAddTraits(.isModal)
         .accessibilityAction(.escape) { beginClose() }
+        .toolbar {
+            if placesBackInHeader {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        TrailhoundHaptics.selection()
+                        beginClose()
+                    } label: {
+                        GlassToolbarSymbol(systemName: "chevron.backward")
+                    }
+                    .accessibilityLabel(L10n.string("onboarding.back"))
+                    .accessibilityIdentifier("liveMap.close")
+                }
+            }
+        }
         .sheet(isPresented: $showsDestinationSheet) {
             LiveFollowDestinationSheet(
                 currentDestination: recordingService.plannedRoute.destination,
@@ -300,16 +315,30 @@ struct LiveFollowMapView: View {
         bottomInset: CGFloat,
         leadingInset: CGFloat,
         hudLeadingInset: CGFloat,
-        gpsClearance: CGFloat
+        gpsClearance: CGFloat,
+        controlLift: CGFloat
     ) -> some View {
         let hudBottom = pinsHUDToLeadingCorner
             ? LiveFollowPresentation.settledBottomPadding + (landscapeDuoCover ? 10 : 28)
             : LiveFollowPresentation.settledBottomPadding + bottomInset
-        return VStack(spacing: 0) {
-            topChrome(gpsClearance: gpsClearance)
+        let portraitCoverDrop: CGFloat = portraitDuoCover ? 16 : 0
+        let chromeTop = topInset + 8 + portraitCoverDrop
+        let coverCameraLeads = landscapeDuoCover && leadingInset > 12
+        let backTop: CGFloat = if !landscapeDuoCover {
+            chromeTop
+        } else if coverCameraLeads {
+            duoCoverBackTop(topInset: topInset, leadingInset: leadingInset)
+        } else {
+            max(topInset, 22)
+        }
+        let cardLeading = (landscapeDuoCover ? 10 : leadingInset) + 52
+        let cardTop = coverCameraLeads ? max(topInset, 32) : backTop
+        return ZStack(alignment: .topLeading) {
+            VStack(spacing: 0) {
+            topChrome(gpsClearance: gpsClearance, showsBack: !landscapeDuoCover && !placesBackInHeader)
                 .padding(.leading, leadingInset)
                 .padding(.trailing, GlassTokens.panelHorizontalInset)
-                .padding(.top, topInset + 10)
+                .padding(.top, chromeTop)
                 .opacity(chromeReveal)
                 .zIndex(2)
 
@@ -328,12 +357,10 @@ struct LiveFollowMapView: View {
                     },
                     onSelectDimension: { setDimensionMode($0) },
                     onOverview: { requestOverview() },
-                    onRecenter: { requestRecenter() }
+                    onRecenter: { requestRecenter() },
+                    trailingColumnLift: controlLift
                 ) {
-                    LiveFollowRouteCard(plannedRoute: recordingService.plannedRoute) {
-                        setDestinationSheet(true)
-                    }
-                    .glassSheetZoomSource(id: LiveFollowDestinationSheet.zoomID, in: destinationZoom)
+                    EmptyView()
                 }
                 .background {
                     GeometryReader { geo in
@@ -351,7 +378,130 @@ struct LiveFollowMapView: View {
             .padding(.trailing, 12)
             .padding(.bottom, hudBottom)
                 .opacity(chromeReveal)
+            }
+            destinationCard(
+                top: cardTop,
+                leading: cardLeading,
+                trailing: landscapeDuoCover ? 12 : 76
+            )
+                .opacity(chromeReveal)
+                .zIndex(2)
+
+            if landscapeDuoCover {
+                backButton
+                    .padding(.leading, 10)
+                    .padding(.top, backTop)
+                    .opacity(chromeReveal)
+                    .zIndex(3)
+            }
         }
+    }
+
+    /// Portrait cover: 10% shorter than the gap between Back and the camera, centered in that gap.
+    private struct PortraitCoverDestinationCenter: ViewModifier {
+        var leading: CGFloat
+        var camera: CGFloat
+        var fraction: CGFloat
+
+        func body(content: Content) -> some View {
+            PortraitCoverDestinationLayout(leading: leading, camera: camera, fraction: fraction) {
+                content
+            }
+        }
+    }
+
+    private struct PortraitCoverDestinationLayout: Layout {
+        var leading: CGFloat
+        var camera: CGFloat
+        var fraction: CGFloat
+
+        func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+            guard let child = subviews.first else { return .zero }
+            let offered = proposal.width ?? child.sizeThatFits(.unspecified).width
+            let slot = max(0, offered - leading - camera)
+            let childWidth = slot * fraction
+            let size = child.sizeThatFits(ProposedViewSize(width: childWidth, height: nil))
+            return CGSize(width: offered, height: size.height)
+        }
+
+        func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+            guard let child = subviews.first else { return }
+            let slot = max(0, bounds.width - leading - camera)
+            let childWidth = slot * fraction
+            let size = child.sizeThatFits(ProposedViewSize(width: childWidth, height: nil))
+            let x = bounds.minX + leading + (slot - childWidth) / 2
+            child.place(
+                at: CGPoint(x: x, y: bounds.minY),
+                anchor: .topLeading,
+                proposal: ProposedViewSize(width: childWidth, height: size.height)
+            )
+        }
+    }
+
+    /// Closed portrait cover is a short phone. The corner camera sits lower than the status inset.
+    private var portraitDuoCover: Bool {
+        !layout.isLandscape
+            && layout.layoutClass == .phone
+            && layout.centersOnboardingColumn
+    }
+
+    /// Closed landscape cover: the card sits on the trailing side, its right edge on Stop’s inset.
+    @ViewBuilder
+    private func destinationCard(top: CGFloat, leading: CGFloat, trailing: CGFloat) -> some View {
+        let card = LiveFollowRouteCard(plannedRoute: recordingService.plannedRoute) {
+            setDestinationSheet(true)
+        }
+        .glassSheetZoomSource(id: LiveFollowDestinationSheet.zoomID, in: destinationZoom)
+        if landscapeDuoCover {
+            card
+                .containerRelativeFrame(.horizontal) { width, _ in
+                    max(0, width - 24) * 0.85 * 0.70
+                }
+                .fixedSize(horizontal: true, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .trailing)
+                .padding(.trailing, 12)
+                .padding(.top, top)
+        } else if portraitDuoCover {
+            card
+                .modifier(
+                    PortraitCoverDestinationCenter(
+                        leading: leading,
+                        camera: 92,
+                        fraction: 0.9
+                    )
+                )
+                .padding(.top, top)
+        } else if placesBackInHeader {
+            card
+                .containerRelativeFrame(.horizontal) { width, _ in
+                    max(0, width - leading - trailing) * 0.70 * 0.85
+                }
+                .fixedSize(horizontal: true, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.leading, 12)
+                .padding(.top, top)
+        } else {
+            card
+                .padding(.leading, leading)
+                .padding(.trailing, trailing)
+                .padding(.top, top)
+        }
+    }
+
+    /// Closed landscape cover. Pause and Stop lift only when the punch hole is in the
+    /// trailing corner. A top-leading camera leaves them on the bottom edge.
+    private func duoCoverControlLift(safe: UIEdgeInsets) -> CGFloat {
+        guard landscapeDuoCover else { return 0 }
+        let trailing = layoutDirection == .rightToLeft ? safe.left : safe.right
+        let leading = layoutDirection == .rightToLeft ? safe.right : safe.left
+        guard trailing > leading, trailing > 20 else { return 0 }
+        return min(max(trailing, 52), 88)
+    }
+
+    /// Closed landscape cover: the punch hole owns the top corner. The circle sits under it.
+    private func duoCoverBackTop(topInset: CGFloat, leadingInset: CGFloat) -> CGFloat {
+        let holeBand = leadingInset > 12 ? leadingInset : 52
+        return max(topInset, holeBand) + 6
     }
 
     private var mapLayer: some View {
@@ -437,24 +587,30 @@ struct LiveFollowMapView: View {
         .accessibilityLabel(L10n.recordingPaused)
     }
 
-    private func topChrome(gpsClearance: CGFloat) -> some View {
+    private var backButton: some View {
+        Button {
+            TrailhoundHaptics.selection()
+            beginClose()
+        } label: {
+            GlassNavCircleIcon(systemName: "chevron.backward")
+        }
+        .buttonStyle(.glassPlainHit)
+        .accessibilityLabel(L10n.string("onboarding.back"))
+        .accessibilityIdentifier("liveMap.close")
+    }
+
+    private func topChrome(gpsClearance: CGFloat, showsBack: Bool) -> some View {
         HStack(spacing: 8) {
-            Button {
-                TrailhoundHaptics.selection()
-                beginClose()
-            } label: {
-                GlassNavCircleIcon(systemName: "chevron.backward")
+            if showsBack {
+                backButton
             }
-            .buttonStyle(.glassPlainHit)
-            .accessibilityLabel(L10n.string("onboarding.back"))
-            .accessibilityIdentifier("liveMap.close")
 
             if isPaused {
                 pauseStatusChip(font: .caption.weight(.bold), iconSize: 13, horizontal: 8, vertical: 6)
                     .fixedSize(horizontal: true, vertical: true)
             }
 
-            if gpsBadgeLeads {
+            if showsGPSBadge, gpsBadgeLeads {
                 gpsBadge
             }
 
@@ -470,7 +626,7 @@ struct LiveFollowMapView: View {
                     .minimumScaleFactor(0.75)
             }
 
-            if !gpsBadgeLeads {
+            if showsGPSBadge, !gpsBadgeLeads {
                 gpsBadge
                     .padding(.trailing, gpsClearance)
             }
@@ -481,6 +637,11 @@ struct LiveFollowMapView: View {
     /// closed landscape cover keep it trailing, clear of the corner camera.
     private var gpsBadgeLeads: Bool {
         layout.layoutClass != .duoOpen && !landscapeDuoCover
+    }
+
+    /// "GPS good" stays off the map. Weak and lost still show.
+    private var showsGPSBadge: Bool {
+        session.displayedGPSQuality != .good
     }
 
     private var gpsBadge: some View {
@@ -544,6 +705,11 @@ struct LiveFollowMapView: View {
         session.isFollowing = true
         session.applyDimensionMode(uses3DLocal)
         recenterRequestToken += 1
+    }
+
+    /// Open upright Duo. The back circle belongs in the window title bar, not on the map.
+    private var placesBackInHeader: Bool {
+        layout.pinsRecordingCardToFold
     }
 
     /// Closed landscape Duo. The cover is the whole screen, so the card stays small and leading.
@@ -1080,28 +1246,44 @@ struct LiveFollowRouteCard: View {
         RoundedRectangle(cornerRadius: 16, style: .continuous)
     }
 
+    /// Dark map glass is a mid blue plate; the palette tint disappears on it.
+    private var bannerInk: Color {
+        colorScheme == .dark ? Color.white : shellPalette.tintColor(for: colorScheme)
+    }
+
+    /// Taller than the old bottom card: padding and type both grow by this much.
+    private var heightScale: CGFloat { 1.25 }
+
     var body: some View {
         TimelineView(.everyMinute) { context in
             let content = LiveFollowRouteChipHost.content(for: plannedRoute, now: context.date)
             let missed = plannedRoute.missedTurn
             let rerouting = plannedRoute.isRerouting
             let maneuver = (missed || rerouting) ? nil : plannedRoute.upcomingManeuver
+            let showsBanner = missed || rerouting || maneuver != nil
             VStack(spacing: 0) {
-                if missed || rerouting || maneuver != nil {
-                    banner(missed: missed, rerouting: rerouting, maneuver: maneuver)
-                        .padding(.horizontal, 10)
-                        .padding(.top, 8)
-                        .padding(.bottom, 6)
+                RecordingRouteChip(
+                    content: content,
+                    action: action,
+                    wide: true,
+                    embedded: true,
+                    heightScale: heightScale
+                )
+                .padding(.horizontal, 8 * heightScale)
+                .padding(.top, 8 * heightScale)
+                .padding(.bottom, showsBanner ? 6 * heightScale : 8 * heightScale)
+                if showsBanner {
                     Rectangle()
                         .fill(Color.white.opacity(colorScheme == .dark ? 0.16 : 0.35))
                         .frame(height: 0.5)
                         .padding(.horizontal, 12)
+                    banner(missed: missed, rerouting: rerouting, maneuver: maneuver)
+                        .padding(.horizontal, 10 * heightScale)
+                        .padding(.top, 6 * heightScale)
+                        .padding(.bottom, 8 * heightScale)
                 }
-                RecordingRouteChip(content: content, action: action, wide: true, embedded: true)
-                    .padding(.horizontal, 8)
-                    .padding(.top, 6)
-                    .padding(.bottom, 8)
             }
+            .frame(maxWidth: .infinity)
             .clipShape(shape)
             .liveMapHUDPlate(shape)
         }
@@ -1133,7 +1315,7 @@ struct LiveFollowRouteCard: View {
                         DateFormatters.formatManeuverDistance(maneuver.distanceMeters),
                         maneuver.instruction
                     ),
-                    systemImage: "signpost.right",
+                    systemImage: ManeuverIcon.systemImage(for: maneuver.instruction),
                     showsProgress: false,
                     identifier: "liveMap.route.maneuver",
                     lineLimit: 2
@@ -1156,12 +1338,12 @@ struct LiveFollowRouteCard: View {
                     .controlSize(.mini)
             } else if let systemImage {
                 Image(systemName: systemImage)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(shellPalette.tintColor(for: colorScheme))
+                    .font(.system(size: 12 * heightScale, weight: .semibold))
+                    .foregroundStyle(bannerInk)
             }
             Text(title)
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(shellPalette.tintColor(for: colorScheme))
+                .font(.system(size: 11 * heightScale + 2, weight: .semibold))
+                .foregroundStyle(bannerInk)
                 .multilineTextAlignment(.center)
                 .lineLimit(lineLimit)
                 .minimumScaleFactor(0.85)
@@ -1205,7 +1387,7 @@ struct LiveFollowRouteNotices: View {
                             DateFormatters.formatManeuverDistance(maneuver.distanceMeters),
                             maneuver.instruction
                         ),
-                        systemImage: "signpost.right",
+                        systemImage: ManeuverIcon.systemImage(for: maneuver.instruction),
                         showsProgress: false,
                         identifier: "liveMap.route.maneuver",
                         lineLimit: 2

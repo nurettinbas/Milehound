@@ -13,6 +13,73 @@ struct UpcomingManeuver: Equatable, Sendable {
     var instruction: String
 }
 
+/// SF Symbol for Apple's maneuver sentence. The text is localized, so the match
+/// covers English and Turkish after folding accents.
+enum ManeuverIcon {
+    static func systemImage(for instruction: String) -> String {
+        let text = folded(instruction)
+        if isUTurn(text) {
+            return side(of: text) == .right ? "arrow.uturn.right" : "arrow.uturn.left"
+        }
+        if text.contains("roundabout") || text.contains("kavsak") {
+            return side(of: text) == .left
+                ? "arrow.triangle.turn.up.left.circle"
+                : "arrow.triangle.turn.up.right.circle"
+        }
+        if text.contains("arriv") || text.contains("destination") || text.contains("varis") || text.contains("hedef") {
+            return "flag.checkered"
+        }
+        if text.contains("merge") || text.contains("katil") {
+            return "arrow.triangle.merge"
+        }
+        let turn = side(of: text)
+        let slight = text.contains("bear") || text.contains("slight") || text.contains("keep ")
+            || text.contains("hafif") || text.contains("sap")
+        let exit = text.contains("exit") || text.contains("ramp") || text.contains("cikis")
+        if slight || exit {
+            switch turn {
+            case .left: return "arrow.up.left"
+            case .right: return "arrow.up.right"
+            case nil: return exit ? "arrow.up.right" : "arrow.up"
+            }
+        }
+        switch turn {
+        case .left: return "arrow.turn.up.left"
+        case .right: return "arrow.turn.up.right"
+        case nil: return "arrow.up"
+        }
+    }
+
+    private enum Side { case left, right }
+
+    private static func folded(_ instruction: String) -> String {
+        instruction
+            .lowercased(with: Locale(identifier: "tr_TR"))
+            .replacingOccurrences(of: "ı", with: "i")
+            .replacingOccurrences(of: "ğ", with: "g")
+            .replacingOccurrences(of: "ü", with: "u")
+            .replacingOccurrences(of: "ş", with: "s")
+            .replacingOccurrences(of: "ö", with: "o")
+            .replacingOccurrences(of: "ç", with: "c")
+            .folding(options: .diacriticInsensitive, locale: Locale(identifier: "en_US_POSIX"))
+    }
+
+    private static func isUTurn(_ text: String) -> Bool {
+        text.contains("u-turn") || text.contains("u turn") || text.contains("uturn")
+            || text.contains("u don") || text.contains("geri don")
+    }
+
+    private static func side(of text: String) -> Side? {
+        if text.contains("left") || text.contains("sola") || text.contains("links") || text.contains("gauche") {
+            return .left
+        }
+        if text.contains("right") || text.contains("saga") || text.contains("rechts") || text.contains("droite") {
+            return .right
+        }
+        return nil
+    }
+}
+
 /// Where the vehicle sits on the planned route, and when to ask MapKit again.
 /// Pure geometry — no MapKit, no SwiftData.
 enum PlannedRouteProgress {

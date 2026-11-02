@@ -170,8 +170,8 @@ extension View {
     }
 
     /// `LiveMapHUDPlate` track for a two-option control on the recording HUD.
-    func recordingSegmentTrack() -> some View {
-        modifier(RecordingSegmentTrackModifier())
+    func recordingSegmentTrack(height: CGFloat = 28, inset: CGFloat = 2) -> some View {
+        modifier(RecordingSegmentTrackModifier(height: height, inset: inset))
     }
 
     /// White thumb behind a selected live-map segment. `namespace` is nil when Reduce Motion is on.
@@ -207,6 +207,8 @@ struct RecordingRouteChip: View {
     var wide: Bool = false
     /// Inside the route card the row is a full-width theme capsule, so it reads as the button.
     var embedded: Bool = false
+    /// 1 keeps the compact chip. The top route card passes 1.25.
+    var heightScale: CGFloat = 1
 
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
@@ -232,23 +234,29 @@ struct RecordingRouteChip: View {
             HStack(spacing: embedded ? 6 : 4) {
                 leading
                 Text(title)
-                    .font(.caption.weight(.bold))
+                    .font(.system(size: 12 * heightScale, weight: .bold))
                     .monospacedDigit()
                     .foregroundStyle(rowInk)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
                 if embedded {
-                    Spacer(minLength: 4)
                     Image(systemName: "chevron.right")
-                        .font(.caption2.weight(.bold))
+                        .font(.system(size: 11 * heightScale, weight: .bold))
                         .foregroundStyle(Color.white)
                         .accessibilityHidden(true)
                 }
             }
-            .padding(.horizontal, wide ? 12 : 8)
-            .padding(.vertical, embedded ? 7 : (wide ? 5 : 3))
-            .frame(maxWidth: wide ? .infinity : nil)
+            .padding(.horizontal, (embedded ? 14 : (wide ? 12 : 8)) * heightScale)
+            .padding(.vertical, (embedded ? 7 : (wide ? 5 : 3)) * heightScale)
+            .fixedSize(horizontal: embedded, vertical: false)
+            .frame(maxWidth: wide && !embedded ? .infinity : nil)
             .chipPlate(embedded: embedded)
+            .compositingGroup()
+            .shadow(
+                color: embedded ? Color.black.opacity(colorScheme == .dark ? 0.45 : 0.22) : .clear,
+                radius: embedded ? 7 : 0,
+                y: embedded ? 3 : 0
+            )
             .contentShape(AnyShape(Capsule()))
         }
         .buttonStyle(.glassPlainHit)
@@ -266,23 +274,24 @@ struct RecordingRouteChip: View {
         switch content {
         case .setDestination:
             Image(systemName: "flag.fill")
-                .font(.caption.weight(.semibold))
+                .font(.system(size: 12 * heightScale, weight: .semibold))
                 .foregroundStyle(rowInk)
         case .loading:
             ProgressView()
                 .controlSize(.mini)
+                .scaleEffect(heightScale)
                 .tint(rowInk)
         case .offline:
             Image(systemName: "wifi.slash")
-                .font(.caption.weight(.semibold))
+                .font(.system(size: 12 * heightScale, weight: .semibold))
                 .foregroundStyle(rowInk)
         case .failed:
             Image(systemName: "exclamationmark.triangle.fill")
-                .font(.caption.weight(.semibold))
+                .font(.system(size: 12 * heightScale, weight: .semibold))
                 .foregroundStyle(GlassSemantic.paused(for: colorScheme))
         case .estimate:
             Image(systemName: "flag.checkered")
-                .font(.caption.weight(.semibold))
+                .font(.system(size: 12 * heightScale, weight: .semibold))
                 .foregroundStyle(rowInk)
         }
     }
@@ -323,10 +332,13 @@ private extension View {
 }
 
 private struct RecordingSegmentTrackModifier: ViewModifier {
+    var height: CGFloat = 28
+    var inset: CGFloat = 2
+
     func body(content: Content) -> some View {
         content
-            .padding(2)
-            .frame(height: 28)
+            .padding(inset)
+            .frame(height: height)
             .liveMapHUDPlate(Capsule())
     }
 }
@@ -407,6 +419,53 @@ private struct RecordingListSurface: View {
     }
 }
 
+/// Map-mode switches used to match the Pause brick (~64×28). They are 50% larger.
+private enum LiveFollowModeSwitchMetrics {
+    static let scale: CGFloat = 1.5
+    static let trackHeight: CGFloat = 28 * scale
+    static let trackInset: CGFloat = 2 * scale
+    static let segmentMinHeight: CGFloat = 22 * scale
+    static let iconSize: CGFloat = 12 * scale
+    static let labelSize: CGFloat = 11 * scale
+    static let capsuleWidth: CGFloat = 64 * scale
+    static let pairWidth: CGFloat = capsuleWidth * 2 + 6
+}
+
+/// Route slot stays put. The card itself is `fraction` of that width and stays centered.
+private struct LiveFollowRouteCardWidth: ViewModifier {
+    var fraction: CGFloat
+
+    func body(content: Content) -> some View {
+        LiveFollowRouteCardWidthLayout(fraction: fraction) {
+            content
+        }
+    }
+}
+
+private struct LiveFollowRouteCardWidthLayout: Layout {
+    var fraction: CGFloat
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        guard let offered = proposal.width, let child = subviews.first else {
+            return subviews.first?.sizeThatFits(.unspecified) ?? .zero
+        }
+        let childWidth = offered * fraction
+        let size = child.sizeThatFits(ProposedViewSize(width: childWidth, height: proposal.height))
+        return CGSize(width: offered, height: size.height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        guard let child = subviews.first else { return }
+        let childWidth = bounds.width * fraction
+        let size = child.sizeThatFits(ProposedViewSize(width: childWidth, height: proposal.height))
+        child.place(
+            at: CGPoint(x: bounds.midX, y: bounds.maxY),
+            anchor: .bottom,
+            proposal: ProposedViewSize(width: childWidth, height: size.height)
+        )
+    }
+}
+
 struct LiveFollowHUDSample: Equatable {
     var duration: String
     var speed: String
@@ -426,6 +485,8 @@ struct LiveFollowHUD<Route: View>: View {
     var onSelectDimension: (Bool) -> Void
     var onOverview: () -> Void
     var onRecenter: () -> Void
+    /// Closed landscape Duo cover: lift Pause and Stop off the trailing corner camera.
+    var trailingColumnLift: CGFloat = 0
     @ViewBuilder var route: () -> Route
 
     @Environment(\.colorScheme) private var colorScheme
@@ -436,9 +497,14 @@ struct LiveFollowHUD<Route: View>: View {
         HStack(alignment: .bottom, spacing: 6) {
             statStack
                 .fixedSize(horizontal: true, vertical: true)
-            route()
-                .frame(minWidth: 0, maxWidth: .infinity)
+            VStack(spacing: 6) {
+                mapModeSwitches
+                route()
+            }
+            .modifier(LiveFollowRouteCardWidth(fraction: 0.85))
+            .frame(minWidth: 0, maxWidth: .infinity)
             controlColumn
+                .padding(.bottom, trailingColumnLift)
                 .fixedSize(horizontal: true, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -454,16 +520,24 @@ struct LiveFollowHUD<Route: View>: View {
         }
     }
 
+    /// 2D/3D and overview/follow, side by side and centered on the destination card.
+    /// One and a half times the old trailing-column size so each half is easier to tap.
+    private var mapModeSwitches: some View {
+        HStack(spacing: 6) {
+            dimensionToggle
+                .frame(maxWidth: .infinity)
+            followToggle
+                .frame(maxWidth: .infinity)
+        }
+        .frame(maxWidth: LiveFollowModeSwitchMetrics.pairWidth)
+        .frame(maxWidth: .infinity)
+        .disabled(isPaused)
+        .opacity(isPaused ? 0.38 : 1)
+        .allowsHitTesting(!isPaused)
+    }
+
     private var controlColumn: some View {
         VStack(spacing: 4) {
-            dimensionToggle
-                .disabled(isPaused)
-                .opacity(isPaused ? 0.38 : 1)
-                .allowsHitTesting(!isPaused)
-            followToggle
-                .disabled(isPaused)
-                .opacity(isPaused ? 0.38 : 1)
-                .allowsHitTesting(!isPaused)
             brickButton(
                 title: isPaused ? L10n.resume : L10n.pause,
                 systemImage: isPaused ? "play.fill" : "pause.fill",
@@ -485,7 +559,10 @@ struct LiveFollowHUD<Route: View>: View {
             dimensionSegment(title: "2D", selected: !uses3D) { onSelectDimension(false) }
             dimensionSegment(title: "3D", selected: uses3D) { onSelectDimension(true) }
         }
-        .recordingSegmentTrack()
+        .recordingSegmentTrack(
+            height: LiveFollowModeSwitchMetrics.trackHeight,
+            inset: LiveFollowModeSwitchMetrics.trackInset
+        )
     }
 
     private var followToggle: some View {
@@ -503,7 +580,10 @@ struct LiveFollowHUD<Route: View>: View {
                 accessibilityLabel: L10n.string("recording.live_map.recenter")
             ) { onRecenter() }
         }
-        .recordingSegmentTrack()
+        .recordingSegmentTrack(
+            height: LiveFollowModeSwitchMetrics.trackHeight,
+            inset: LiveFollowModeSwitchMetrics.trackInset
+        )
     }
 
     private func dimensionSegment(
@@ -517,9 +597,9 @@ struct LiveFollowHUD<Route: View>: View {
             action()
         } label: {
             Text(title)
-                .font(.caption2.weight(.bold))
+                .font(.system(size: LiveFollowModeSwitchMetrics.labelSize, weight: .bold))
                 .lineLimit(1)
-                .frame(maxWidth: .infinity, minHeight: 22)
+                .frame(maxWidth: .infinity, minHeight: LiveFollowModeSwitchMetrics.segmentMinHeight)
                 .recordingSegmentThumb(isSelected: selected, morphID: "live.dimension", namespace: nil)
         }
         .buttonStyle(.glassPlainHit)
@@ -544,8 +624,8 @@ struct LiveFollowHUD<Route: View>: View {
             action()
         } label: {
             Image(systemName: systemName)
-                .font(.system(size: 12, weight: .semibold))
-                .frame(maxWidth: .infinity, minHeight: 22)
+                .font(.system(size: LiveFollowModeSwitchMetrics.iconSize, weight: .semibold))
+                .frame(maxWidth: .infinity, minHeight: LiveFollowModeSwitchMetrics.segmentMinHeight)
                 .recordingSegmentThumb(isSelected: selected, morphID: "live.follow", namespace: nil)
         }
         .buttonStyle(.glassPlainHit)
@@ -566,19 +646,31 @@ struct LiveFollowHUD<Route: View>: View {
                 Image(systemName: systemImage)
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(tint)
-                Text(title)
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(tint)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
+                brickTitle(title, tint: tint)
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 5)
+            .frame(maxWidth: .infinity)
             .liveMapHUDPlate(columnShape, interactive: true)
             .contentShape(columnShape)
         }
         .buttonStyle(.glassPlainHit)
         .accessibilityIdentifier(identifier)
+    }
+
+    /// Pause, Resume, and Stop share one width, so a longer translation does not
+    /// make one brick wider than the other.
+    private func brickTitle(_ title: String, tint: Color) -> some View {
+        ZStack {
+            Text(L10n.pause).hidden()
+            Text(L10n.resume).hidden()
+            Text(L10n.stop).hidden()
+            Text(title)
+        }
+        .font(.caption2.weight(.semibold))
+        .foregroundStyle(tint)
+        .lineLimit(1)
+        .minimumScaleFactor(0.7)
     }
 
     private var columnShape: RoundedRectangle {
@@ -687,9 +779,9 @@ private struct LiveFollowHUDStat: View {
                 .monospacedDigit()
                 .numericTextAnimation(value: value)
         }
-        .fixedSize(horizontal: true, vertical: true)
         .padding(.horizontal, 6)
         .padding(.vertical, 3)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .liveMapHUDPlate(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 }

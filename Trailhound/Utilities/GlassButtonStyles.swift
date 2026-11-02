@@ -97,11 +97,17 @@ private struct TrailhoundGlassButtonModifier: ViewModifier {
 
 /// Solid system-red fill lives in `makeBody` so the capsule — not the title glyphs — is the control.
 private struct TrailhoundDestructiveButtonStyle: ButtonStyle {
+    var compact: Bool = false
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.body.weight(.semibold))
+            .font(compact ? .subheadline.weight(.semibold) : .body.weight(.semibold))
             .foregroundStyle(Color.white)
-            .frame(maxWidth: .infinity, minHeight: 34)
+            .lineLimit(1)
+            .minimumScaleFactor(compact ? 0.8 : 1)
+            .padding(.horizontal, compact ? 12 : 0)
+            .frame(maxWidth: compact ? nil : .infinity, minHeight: compact ? 32 : 34)
+            .fixedSize(horizontal: compact, vertical: false)
             .background {
                 Capsule(style: .continuous)
                     .fill(GlassSemantic.notificationBadge)
@@ -137,6 +143,11 @@ extension View {
     /// Solid system-red fill — never glass-prominent, never Appearance tint.
     func trailhoundDestructiveButton() -> some View {
         buttonStyle(TrailhoundDestructiveButtonStyle())
+    }
+
+    /// Same red capsule, intrinsic width, slightly smaller title. For a label beside other content.
+    func trailhoundCompactDestructiveButton() -> some View {
+        buttonStyle(TrailhoundDestructiveButtonStyle(compact: true))
     }
 
     /// Icon-only control in a compact field (search clear). Expands the glyph to a hittable square.

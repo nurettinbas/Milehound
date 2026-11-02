@@ -114,7 +114,12 @@ struct LiveFollowDestinationSheet: View {
             onClear: onClear,
             onDismiss: onDismiss
         )
-        .modifier(LiveFollowDestinationPresentation(formSizing: Self.usesFormSizing(layout)))
+        .modifier(
+            LiveFollowDestinationPresentation(
+                formSizing: Self.usesFormSizing(layout),
+                opensFull: !layout.isLandscape
+            )
+        )
         .task(id: allowsSearch) {
             await loadNearbyPlaces()
         }
@@ -268,7 +273,7 @@ struct LiveFollowDestinationSheetContent: View {
             TrailhoundHaptics.selection()
             onClear()
         }
-        .trailhoundDestructiveButton()
+        .trailhoundCompactDestructiveButton()
         .accessibilityIdentifier("liveMap.destination.clear")
     }
 
@@ -434,10 +439,11 @@ struct LiveFollowDestinationSheetContent: View {
 /// Bottom sheet on phones; centered form on the open Duo and iPad.
 private struct LiveFollowDestinationPresentation: ViewModifier {
     var formSizing: Bool
+    var opensFull: Bool
 
     func body(content: Content) -> some View {
         content
-            .modifier(Sizing(formSizing: formSizing))
+            .modifier(Sizing(formSizing: formSizing, opensFull: opensFull))
             .presentationCornerRadius(28)
             .presentationBackground {
                 AtmosphericBackground(style: .full)
@@ -448,6 +454,7 @@ private struct LiveFollowDestinationPresentation: ViewModifier {
 
     private struct Sizing: ViewModifier {
         var formSizing: Bool
+        var opensFull: Bool
 
         func body(content: Content) -> some View {
             if formSizing {
@@ -458,6 +465,8 @@ private struct LiveFollowDestinationPresentation: ViewModifier {
                 } else {
                     content.presentationDetents([.large])
                 }
+            } else if opensFull {
+                content.presentationDetents([.large])
             } else {
                 content.presentationDetents([.medium, .large])
             }
