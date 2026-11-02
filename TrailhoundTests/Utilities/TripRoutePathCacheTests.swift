@@ -217,6 +217,9 @@ final class TripRoutePathCacheTests: XCTestCase {
 @MainActor
 final class TripDetailTripSwitchTests: XCTestCase {
     private var container: ModelContainer!
+    /// The live trip page can still hold a model after the path is cleared. Releasing the
+    /// in-memory container then destroys that model and crashes the next test.
+    private static var keptContainers: [ModelContainer] = []
 
     override func setUp() async throws {
         try await super.setUp()
@@ -224,11 +227,15 @@ final class TripDetailTripSwitchTests: XCTestCase {
     }
 
     override func tearDown() {
+        TabSelection.shared.tripsPath = NavigationPath()
         let trips = (try? container?.mainContext.fetch(FetchDescriptor<Trip>())) ?? []
         for trip in trips {
             TripRoutePathCache.shared.remove(for: trip.id)
         }
         TripRoutePathCache.shared.clearMemory()
+        if let container {
+            Self.keptContainers.append(container)
+        }
         container = nil
         super.tearDown()
     }

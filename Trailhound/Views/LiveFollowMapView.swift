@@ -1,5 +1,6 @@
 import CoreLocation
 import MapKit
+import SwiftData
 import SwiftUI
 import UIKit
 
@@ -28,6 +29,7 @@ struct LiveFollowMapView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.shellPalette) private var shellPalette
     @Environment(\.trailhoundLayout) private var layout
+    @Environment(\.foldPaneHeaderBottom) private var foldHeaderBottom
     @Environment(\.layoutDirection) private var layoutDirection
     @Bindable private var settings = AppSettings.shared
 
@@ -59,22 +61,21 @@ struct LiveFollowMapView: View {
     @State private var idleLockHeld = false
     /// Local 2D/3D mirror — avoids rebuilding the MapKit host on every settings write.
     @State private var uses3DLocal = true
-    @Namespace private var mapToolMorph
     /// Bumped to ask MapKit to fit start + traveled path + puck (north-up 2D).
     @State private var overviewRequestToken = 0
     @State private var recenterRequestToken = 0
     /// First recorded breadcrumb — kept for the cover's lifetime so the start flag
     /// cannot vanish if the live array is briefly empty.
     @State private var latchedStartCoordinate: CLLocationCoordinate2D?
+    @State private var showsDestinationSheet = false
+    @State private var routeCardCollapsed = false
+    @Namespace private var destinationZoom
+    @Environment(\.modelContext) private var modelContext
 
     private var uses3D: Bool { uses3DLocal }
 
     private var isPaused: Bool {
         recordingService.state == .paused
-    }
-
-    private var statusText: String {
-        isPaused ? L10n.recordingPaused : L10n.recordingStarted
     }
 
     private var tipCoordinate: CLLocationCoordinate2D? {
@@ -102,7 +103,8 @@ struct LiveFollowMapView: View {
         LiveFollowMapPinBuilder.pins(
             startCoordinate: startPinCoordinate,
             pauseCoordinates: pausePinCoordinates,
-            tripStopCoordinates: tripStopCoordinates
+            tripStopCoordinates: tripStopCoordinates,
+            destinationCoordinate: recordingService.plannedRoute.destination?.coordinate
         )
     }
 
@@ -168,9 +170,18 @@ struct LiveFollowMapView: View {
                     settledChromeStack(
                         topInset: topInset,
                         bottomInset: bottomInset,
-                        width: geo.size.width,
-                        gpsClearance: gpsCameraClearance(safe: safe)
+                        leadingInset: leadingChromeInset(safe: safe),
+                        hudLeadingInset: hudLeadingInset(safe: safe),
+                        gpsClearance: gpsCameraClearance(safe: safe),
+                        controlLift: duoCoverControlLift(safe: safe)
                     )
+
+                    CardExpandBackSwipeStrip(
+                        enabled: !isClosing,
+                        topClearance: topInset + CardExpandBackSwipe.headerClearance,
+                        onClose: { beginClose() }
+                    )
+                    .zIndex(3)
 
                     if showHeroFlight {
                         LiveFollowVehicleHero(
@@ -195,7 +206,7 @@ struct LiveFollowMapView: View {
         .opacity(isSceneVisible ? 1 : 0)
         .animation(nil, value: isSceneVisible)
         .allowsHitTesting(isSceneVisible)
-        .ignoresSafeArea(edges: fillsPane ? .vertical : .all)
+        .ignoresSafeArea()
         .animation(reduceMotion ? nil : TrailhoundMotion.gentle, value: isPaused)
         .statusBarHidden(false)
         .onAppear {
@@ -250,41 +261,116 @@ struct LiveFollowMapView: View {
             session.applyDimensionMode(enabled)
         }
         .accessibilityAddTraits(.isModal)
+        .accessibilityAction(.escape) { beginClose() }
+        .toolbar {
+            if placesBackInHeader {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        TrailhoundHaptics.selection()
+                        beginClose()
+                    } label: {
+                        GlassToolbarSymbol(systemName: "chevron.backward")
+                    }
+                    .accessibilityLabel(L10n.string("onboarding.back"))
+                    .accessibilityIdentifier("liveMap.close")
+                }
+            }
+        }
+        .sheet(isPresented: $showsDestinationSheet) {
+            LiveFollowDestinationSheet(
+                currentDestination: recordingService.plannedRoute.destination,
+                searchCenter: routeOrigin,
+                onPick: { destination in
+                    recordingService.plannedRoute.setDestination(destination, origin: routeOrigin)
+                    setDestinationSheet(false)
+                },
+                onClear: {
+                    recordingService.plannedRoute.clear()
+                    setDestinationSheet(false)
+                },
+                onDismiss: { setDestinationSheet(false) }
+            )
+            .environment(recordingService)
+            .environment(\.trailhoundLayout, layout)
+            .environment(\.shellPalette, shellPalette)
+            .modelContext(modelContext)
+            .glassSheetZoom(from: LiveFollowDestinationSheet.zoomID, in: destinationZoom)
+        }
+    }
+
+    private func setDestinationSheet(_ shown: Bool) {
+        var transaction = Transaction()
+        transaction[LiveFollowSheetTransition.self] = true
+        withTransaction(transaction) {
+            showsDestinationSheet = shown
+        }
+    }
+
+    /// Where the planned route starts: the live vehicle, else the last fix or breadcrumb.
+    /// UI tests on a simulator without GPS use a fixed seed origin.
+    private var routeOrigin: CLLocationCoordinate2D? {
+        tipCoordinate ?? (UITestSupport.seedsPlannedRoute ? UITestSupport.plannedRouteSeedOrigin : nil)
     }
 
     private func settledChromeStack(
         topInset: CGFloat,
         bottomInset: CGFloat,
-        width: CGFloat,
-        gpsClearance: CGFloat
+        leadingInset: CGFloat,
+        hudLeadingInset: CGFloat,
+        gpsClearance: CGFloat,
+        controlLift: CGFloat
     ) -> some View {
-        let proportional = min(
-            width * LiveFollowPresentation.settledWidthSpan / LiveFollowPresentation.settledWidthCount,
-            max(0, width - 32)
-        )
-        // A wide book half used to stretch the card edge to edge. Keep the phone card's size.
-        // Landscape Duo cover is wider still — keep a short card in the leading corner.
-        let hudWidth: CGFloat = if landscapeDuoCover {
-            min(proportional, 250)
-        } else if fillsPane {
-            min(proportional, 320)
-        } else {
-            proportional
-        }
         let hudBottom = pinsHUDToLeadingCorner
             ? LiveFollowPresentation.settledBottomPadding + (landscapeDuoCover ? 10 : 28)
             : LiveFollowPresentation.settledBottomPadding + bottomInset
-        return VStack(spacing: 0) {
-            topChrome(gpsClearance: gpsClearance)
-                .padding(.horizontal, GlassTokens.panelHorizontalInset)
-                .padding(.top, topInset + 10)
+        let portraitCoverDrop: CGFloat = portraitDuoCover ? 16 : 0
+        let chromeTop = topInset + 8 + portraitCoverDrop
+        let coverCameraLeads = landscapeDuoCover && leadingInset > 12
+        let backTop: CGFloat = if !landscapeDuoCover {
+            chromeTop
+        } else if coverCameraLeads {
+            duoCoverBackTop(topInset: topInset, leadingInset: leadingInset)
+        } else {
+            max(topInset, 22)
+        }
+        let cardLeading = (landscapeDuoCover ? 10 : leadingInset) + 52
+        // The title bar can sit below the safe top, and Back is in that bar.
+        let cardTop: CGFloat = if coverCameraLeads {
+            max(topInset, 32)
+        } else if placesBackInHeader {
+            max(backTop, foldHeaderBottom + 8)
+        } else {
+            backTop
+        }
+        return ZStack(alignment: .topLeading) {
+            VStack(spacing: 0) {
+            topChrome(gpsClearance: gpsClearance, showsBack: !landscapeDuoCover && !placesBackInHeader)
+                .padding(.leading, leadingInset)
+                .padding(.trailing, GlassTokens.panelHorizontalInset)
+                .padding(.top, chromeTop)
                 .opacity(chromeReveal)
                 .zIndex(2)
 
             Spacer(minLength: 0)
 
-            bottomHUD(useGlass: true, tight: landscapeDuoCover)
-                .frame(width: hudWidth, alignment: .leading)
+            VStack(alignment: .leading, spacing: 6) {
+            LiveFollowHUD(
+                tight: layout.isLandscape || landscapeDuoCover,
+                    isPaused: isPaused,
+                    uses3D: uses3DLocal,
+                    isFollowing: isFollowing,
+                    stats: nil,
+                    onPause: { togglePause() },
+                    onStop: {
+                        onStop(hudAnchorBox.value.width > 0 ? hudAnchorBox.value : cardAnchor)
+                    },
+                    onSelectDimension: { setDimensionMode($0) },
+                    onOverview: { requestOverview() },
+                    onRecenter: { requestRecenter() },
+                    trailingColumnLift: controlLift
+                ) {
+                    EmptyView()
+                }
                 .background {
                     GeometryReader { geo in
                         let frame = geo.frame(in: .global)
@@ -295,11 +381,139 @@ struct LiveFollowMapView: View {
                             .onChange(of: frame.size.height) { _, _ in updateHUDAnchor(frame) }
                     }
                 }
-                .frame(maxWidth: .infinity, alignment: pinsHUDToLeadingCorner ? .leading : .center)
-                .padding(.leading, pinsHUDToLeadingCorner ? 12 : 0)
-                .padding(.bottom, hudBottom)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.leading, hudLeadingInset)
+            .padding(.trailing, 12)
+            .padding(.bottom, hudBottom)
                 .opacity(chromeReveal)
+            }
+            destinationCard(
+                top: cardTop,
+                leading: cardLeading,
+                trailing: landscapeDuoCover ? 12 : 76
+            )
+                .opacity(chromeReveal)
+                .zIndex(2)
+
+            if landscapeDuoCover {
+                backButton
+                    .padding(.leading, 10)
+                    .padding(.top, backTop)
+                    .opacity(chromeReveal)
+                    .zIndex(3)
+            }
         }
+    }
+
+    /// Portrait cover: 19% shorter than the gap between Back and the camera, centered in that gap.
+    private struct PortraitCoverDestinationCenter: ViewModifier {
+        var leading: CGFloat
+        var camera: CGFloat
+        var fraction: CGFloat
+
+        func body(content: Content) -> some View {
+            PortraitCoverDestinationLayout(leading: leading, camera: camera, fraction: fraction) {
+                content
+            }
+        }
+    }
+
+    private struct PortraitCoverDestinationLayout: Layout {
+        var leading: CGFloat
+        var camera: CGFloat
+        var fraction: CGFloat
+
+        func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+            guard let child = subviews.first else { return .zero }
+            let offered = proposal.width ?? child.sizeThatFits(.unspecified).width
+            let slot = max(0, offered - leading - camera)
+            let childWidth = slot * fraction
+            let size = child.sizeThatFits(ProposedViewSize(width: childWidth, height: nil))
+            return CGSize(width: offered, height: size.height)
+        }
+
+        func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+            guard let child = subviews.first else { return }
+            let slot = max(0, bounds.width - leading - camera)
+            let childWidth = slot * fraction
+            let size = child.sizeThatFits(ProposedViewSize(width: childWidth, height: nil))
+            let x = bounds.minX + leading + (slot - childWidth) / 2
+            child.place(
+                at: CGPoint(x: x, y: bounds.minY),
+                anchor: .topLeading,
+                proposal: ProposedViewSize(width: childWidth, height: size.height)
+            )
+        }
+    }
+
+    /// Closed portrait cover is a short phone. The corner camera sits lower than the status inset.
+    private var portraitDuoCover: Bool {
+        !layout.isLandscape
+            && layout.layoutClass == .phone
+            && layout.centersOnboardingColumn
+    }
+
+    /// Closed landscape cover: the card sits on the trailing side, its right edge on Stop’s inset.
+    @ViewBuilder
+    private func destinationCard(top: CGFloat, leading: CGFloat, trailing: CGFloat) -> some View {
+        let card = LiveFollowRouteCard(
+            plannedRoute: recordingService.plannedRoute,
+            isCollapsed: $routeCardCollapsed,
+            collapsedAlignment: landscapeDuoCover ? .trailing : .leading
+        ) {
+            setDestinationSheet(true)
+        }
+        .glassSheetZoomSource(id: LiveFollowDestinationSheet.zoomID, in: destinationZoom)
+        if landscapeDuoCover {
+            card
+                .containerRelativeFrame(.horizontal) { width, _ in
+                    max(0, width - 24) * 0.85 * 0.70
+                }
+                .fixedSize(horizontal: true, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .trailing)
+                .padding(.trailing, 12)
+                .padding(.top, top)
+        } else if portraitDuoCover {
+            card
+                .modifier(
+                    PortraitCoverDestinationCenter(
+                        leading: leading,
+                        camera: 92,
+                        fraction: 0.81
+                    )
+                )
+                .padding(.top, top)
+        } else if placesBackInHeader {
+            card
+                .containerRelativeFrame(.horizontal) { width, _ in
+                    max(0, width - leading - trailing) * 0.70 * 0.85
+                }
+                .fixedSize(horizontal: true, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.leading, 12)
+                .padding(.top, top)
+        } else {
+            card
+                .padding(.leading, leading)
+                .padding(.trailing, trailing)
+                .padding(.top, top)
+        }
+    }
+
+    /// Closed landscape cover. Pause and Stop lift only when the punch hole is in the
+    /// trailing corner. A top-leading camera leaves them on the bottom edge.
+    private func duoCoverControlLift(safe: UIEdgeInsets) -> CGFloat {
+        guard landscapeDuoCover else { return 0 }
+        let trailing = layoutDirection == .rightToLeft ? safe.left : safe.right
+        let leading = layoutDirection == .rightToLeft ? safe.right : safe.left
+        return TrailhoundLayoutSnapshot.closedCoverCameraLift(trailing: trailing, leading: leading)
+    }
+
+    /// Closed landscape cover: the punch hole owns the top corner. The circle sits under it.
+    private func duoCoverBackTop(topInset: CGFloat, leadingInset: CGFloat) -> CGFloat {
+        let holeBand = leadingInset > 12 ? leadingInset : 52
+        return max(topInset, holeBand) + 6
     }
 
     private var mapLayer: some View {
@@ -385,33 +599,36 @@ struct LiveFollowMapView: View {
         .accessibilityLabel(L10n.recordingPaused)
     }
 
-    private func topChrome(gpsClearance: CGFloat) -> some View {
+    private var backButton: some View {
+        Button {
+            TrailhoundHaptics.selection()
+            beginClose()
+        } label: {
+            GlassNavCircleIcon(systemName: "chevron.backward")
+        }
+        .buttonStyle(.glassPlainHit)
+        .accessibilityLabel(L10n.string("onboarding.back"))
+        .accessibilityIdentifier("liveMap.close")
+    }
+
+    private func topChrome(gpsClearance: CGFloat, showsBack: Bool) -> some View {
         HStack(spacing: 8) {
+            if showsBack {
+                backButton
+            }
+
             if isPaused {
                 pauseStatusChip(font: .caption.weight(.bold), iconSize: 13, horizontal: 8, vertical: 6)
-            } else {
-                HStack(spacing: 4) {
-                    Image(systemName: "record.circle.fill")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(Color.red)
-                        .symbolEffect(
-                            .pulse,
-                            options: .repeating,
-                            isActive: !reduceMotion && mapMounted
-                        )
-                    Text(statusText)
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(GlassText.primary(for: colorScheme))
-                        .lineLimit(1)
-                }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 6)
-                .glassChrome(cornerRadius: 14)
+                    .fixedSize(horizontal: true, vertical: true)
+            }
+
+            if showsGPSBadge, gpsBadgeLeads {
+                gpsBadge
             }
 
             Spacer(minLength: 4)
 
-            if !networkMonitor.isConnected {
+            if !networkMonitor.isConnected, recordingService.plannedRoute.destination == nil {
                 Text(L10n.tripMapOfflineHint)
                     .font(.caption2)
                     .padding(.horizontal, 8)
@@ -421,9 +638,40 @@ struct LiveFollowMapView: View {
                     .minimumScaleFactor(0.75)
             }
 
-            GPSQualityBadge(quality: session.displayedGPSQuality, compact: true)
-                .padding(.trailing, gpsClearance)
+            if showsGPSBadge, !gpsBadgeLeads {
+                gpsBadge
+                    .padding(.trailing, gpsClearance)
+            }
         }
+    }
+
+    /// Phone and iPad: on the leading edge, beside Back. The open Duo and the
+    /// closed landscape cover keep it trailing, clear of the corner camera.
+    private var gpsBadgeLeads: Bool {
+        layout.layoutClass != .duoOpen && !landscapeDuoCover
+    }
+
+    /// "GPS good" stays off the map. Weak and lost still show.
+    private var showsGPSBadge: Bool {
+        session.displayedGPSQuality != .good
+    }
+
+    private var gpsBadge: some View {
+        GPSQualityBadge(quality: session.displayedGPSQuality, compact: true)
+            .fixedSize(horizontal: true, vertical: true)
+    }
+
+    /// Camera hole on the leading edge: the top row clears it. The stat stack sits lower, beside empty bezel, so it does not.
+    private func leadingChromeInset(safe: UIEdgeInsets) -> CGFloat {
+        let hole = layoutDirection == .rightToLeft ? safe.right : safe.left
+        if hole >= 44 { return hole + 8 }
+        return 12
+    }
+
+    /// Duration, speed, and distance. Landscape keeps them on the pane edge in both rotations.
+    private func hudLeadingInset(safe: UIEdgeInsets) -> CGFloat {
+        if layout.isLandscape { return 8 }
+        return leadingChromeInset(safe: safe)
     }
 
     /// The punch-hole sits in the trailing corner, and the map ignores that inset.
@@ -435,142 +683,21 @@ struct LiveFollowMapView: View {
         return layout.isLandscape ? 64 : 72
     }
 
-    /// 2D/3D, overview/follow switch, and close — chips on the palette-tinted recording HUD.
-    private var mapToolsRail: some View {
-        HStack(spacing: 8) {
-            if layout.pinsOverlayCloseLeading {
-                liveMapCloseButton
-            }
-            mapDimensionToggle
-                .disabled(isPaused)
-                .opacity(isPaused ? 0.38 : 1)
-                .allowsHitTesting(!isPaused)
-                .animation(reduceMotion ? nil : TrailhoundMotion.recordingToggle, value: uses3DLocal)
-            mapFollowToggle
-                .disabled(isPaused)
-                .opacity(isPaused ? 0.38 : 1)
-                .allowsHitTesting(!isPaused)
-                .animation(reduceMotion ? nil : TrailhoundMotion.recordingToggle, value: isFollowing)
-
-            Spacer(minLength: 8)
-
-            if !layout.pinsOverlayCloseLeading {
-                liveMapCloseButton
+    private func togglePause() {
+        let toggle = {
+            if isPaused {
+                recordingService.resumeRecording()
+            } else {
+                recordingService.pauseRecording()
             }
         }
-        .accessibilityElement(children: .contain)
-    }
-
-    private var liveMapCloseButton: some View {
-        Button {
-            TrailhoundHaptics.selection()
-            beginClose()
-        } label: {
-            Image(systemName: "xmark")
-                .font(.system(size: 11, weight: .bold))
-                .foregroundStyle(.white)
-                .frame(width: 33, height: 33)
-                .background(GlassSemantic.notificationBadge, in: Capsule())
-                .compositingGroup()
-        }
-        .buttonStyle(.glassPlainHit)
-        .accessibilityLabel(L10n.string("recording.live_map.close"))
-    }
-
-    private var mapDimensionToggle: some View {
-        mapCapsuleToggle {
-            mapDimensionSegment(title: "2D", selected: !uses3DLocal) {
-                setDimensionMode(false)
-            }
-            mapDimensionSegment(title: "3D", selected: uses3DLocal) {
-                setDimensionMode(true)
+        if reduceMotion {
+            toggle()
+        } else {
+            withAnimation(TrailhoundMotion.recordingToggle) {
+                toggle()
             }
         }
-    }
-
-    /// Overview vs heading-follow — same capsule switch as 2D/3D.
-    private var mapFollowToggle: some View {
-        mapCapsuleToggle {
-            mapIconSegment(
-                systemName: "arrow.up.left.and.arrow.down.right",
-                selected: !isFollowing,
-                ignoreIfSelected: false,
-                accessibilityLabel: L10n.string("recording.live_map.overview")
-            ) {
-                requestOverview()
-            }
-            mapIconSegment(
-                systemName: isFollowing ? "location.north.line.fill" : "location.north.line",
-                selected: isFollowing,
-                ignoreIfSelected: true,
-                accessibilityLabel: L10n.string("recording.live_map.recenter")
-            ) {
-                requestRecenter()
-            }
-        }
-    }
-
-    private func mapCapsuleToggle<Content: View>(@ViewBuilder content: () -> Content) -> some View {
-        HStack(spacing: 0, content: content)
-            .recordingSegmentTrack()
-    }
-
-    private var mapToolNamespace: Namespace.ID? {
-        reduceMotion ? nil : mapToolMorph
-    }
-
-    private func mapDimensionSegment(
-        title: String,
-        selected: Bool,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button {
-            guard !selected else { return }
-            TrailhoundHaptics.selection()
-            action()
-        } label: {
-            Text(title)
-                .font(.caption.weight(.bold))
-                .frame(width: 33, height: 29)
-                .recordingSegmentThumb(
-                    isSelected: selected,
-                    morphID: "live.dimension",
-                    namespace: mapToolNamespace
-                )
-        }
-        .buttonStyle(.glassPlainHit)
-        .accessibilityLabel(
-            title == "2D"
-                ? L10n.string("recording.live_map.switch_2d")
-                : L10n.string("recording.live_map.switch_3d")
-        )
-        .accessibilityAddTraits(selected ? .isSelected : [])
-    }
-
-    private func mapIconSegment(
-        systemName: String,
-        selected: Bool,
-        ignoreIfSelected: Bool,
-        accessibilityLabel: String,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button {
-            if ignoreIfSelected, selected { return }
-            TrailhoundHaptics.selection()
-            action()
-        } label: {
-            Image(systemName: systemName)
-                .font(.system(size: 12, weight: .semibold))
-                .frame(width: 33, height: 29)
-                .recordingSegmentThumb(
-                    isSelected: selected,
-                    morphID: "live.follow",
-                    namespace: mapToolNamespace
-                )
-        }
-        .buttonStyle(.glassPlainHit)
-        .accessibilityLabel(accessibilityLabel)
-        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
     private func setDimensionMode(_ enabled3D: Bool) {
@@ -592,88 +719,18 @@ struct LiveFollowMapView: View {
         recenterRequestToken += 1
     }
 
+    /// Open upright Duo. The back circle belongs in the window title bar, not on the map.
+    private var placesBackInHeader: Bool {
+        layout.pinsRecordingCardToFold
+    }
+
     /// Closed landscape Duo. The cover is the whole screen, so the card stays small and leading.
     private var landscapeDuoCover: Bool {
         !fillsPane && layout.layoutClass == .phoneLandscape && !layout.isPhoneBook
     }
 
     private var pinsHUDToLeadingCorner: Bool {
-        pinsAttributionToBottomCorner || landscapeDuoCover
-    }
-
-    private func bottomHUD(useGlass: Bool, tight: Bool = false) -> some View {
-        VStack(alignment: .leading, spacing: tight ? 6 : 9) {
-            mapToolsRail
-
-            Rectangle()
-                .fill(.white.opacity(0.16))
-                .frame(height: 1)
-
-            ActiveTripLiveStats(compact: true, arrangement: .inline)
-
-            HStack(spacing: 8) {
-                Button {
-                    let toggle = {
-                        if isPaused {
-                            recordingService.resumeRecording()
-                        } else {
-                            recordingService.pauseRecording()
-                        }
-                    }
-                    if reduceMotion {
-                        toggle()
-                    } else {
-                        withAnimation(TrailhoundMotion.recordingToggle) {
-                            toggle()
-                        }
-                    }
-                } label: {
-                    RecordingActionLabel(
-                        title: isPaused ? L10n.resume : L10n.pause,
-                        systemImage: isPaused ? "play.fill" : "pause.fill",
-                        compact: true
-                    )
-                }
-                .buttonStyle(SoftPressBorderedButtonStyle(reduceMotion: reduceMotion))
-                .controlSize(.small)
-                .tint(.white)
-                .frame(maxWidth: .infinity, minHeight: 34)
-
-                Button(role: .destructive) {
-                    // No reverse morph — parent dismisses instantly then plays end credits.
-                    onStop(hudAnchorBox.value.width > 0 ? hudAnchorBox.value : cardAnchor)
-                } label: {
-                    RecordingActionLabel(title: L10n.stop, systemImage: "stop.fill", compact: true)
-                }
-                .buttonStyle(
-                    SoftPressBorderedButtonStyle(
-                        reduceMotion: reduceMotion,
-                        prominent: true
-                    )
-                )
-                .controlSize(.small)
-                .tint(GlassSemantic.notificationBadge)
-                .frame(maxWidth: .infinity, minHeight: 34)
-            }
-            .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(tight ? 8 : 10)
-        // Width fills the HUD slot; height stays intrinsic so settled layout does not
-        // stretch into the Spacer (morphing phase applies an explicit height separately).
-        .frame(maxWidth: .infinity, alignment: .topLeading)
-        .fixedSize(horizontal: false, vertical: true)
-        .background {
-            if useGlass {
-                RecordingCardStyle.glassSurface(isPaused: isPaused)
-            } else {
-                RecordingCardStyle.listSurface(isPaused: isPaused)
-            }
-        }
-        .clipShape(RoundedRectangle(cornerRadius: RecordingCardStyle.cornerRadius, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: RecordingCardStyle.cornerRadius, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.28), lineWidth: 1)
-        }
+        layout.isLandscape || pinsAttributionToBottomCorner || landscapeDuoCover
     }
 
     @MainActor
@@ -1180,6 +1237,403 @@ private struct LiveFollowNavChevron: Shape {
         }
         cg.closeSubpath()
         return Path(cg)
+    }
+}
+
+/// Marks the destination sheet's present and dismiss, and the route card's collapse. The live map
+/// cover turns animations off for everything else, which would make them pop instead of moving.
+struct LiveFollowSheetTransition: TransactionKey {
+    static let defaultValue = false
+}
+
+/// One plate: the destination row on top, the next turn underneath. The row is the button.
+/// Collapsed, the plate shrinks into one glass circle so the whole map shows; a tap widens it back.
+struct LiveFollowRouteCard: View {
+    var plannedRoute: PlannedRouteStore
+    @Binding var isCollapsed: Bool
+    /// Where the circle rests inside the card's slot.
+    var collapsedAlignment: Alignment = .leading
+    var action: () -> Void
+
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.shellPalette) private var shellPalette
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Namespace private var morph
+
+    private static let morphID = "liveMap.routeCard"
+
+    private var shape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: 16, style: .continuous)
+    }
+
+    /// Dark map glass is a mid blue plate; the palette tint disappears on it.
+    private var bannerInk: Color {
+        colorScheme == .dark ? Color.white : shellPalette.tintColor(for: colorScheme)
+    }
+
+    /// Taller than the old bottom card: padding and type both grow by this much.
+    private var heightScale: CGFloat { 1.25 }
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 30)) { context in
+            let content = LiveFollowRouteChipHost.content(for: plannedRoute, now: context.date)
+            let missed = plannedRoute.missedTurn
+            let rerouting = plannedRoute.isRerouting
+            let maneuver = (missed || rerouting) ? nil : plannedRoute.upcomingManeuver
+            ZStack(alignment: collapsedAlignment) {
+                if isCollapsed {
+                    collapsedButton(content: content, missed: missed, rerouting: rerouting, maneuver: maneuver)
+                        .matchedGeometryEffect(id: Self.morphID, in: morph)
+                        .transition(.opacity)
+                } else {
+                    expandedCard(content: content, missed: missed, rerouting: rerouting, maneuver: maneuver)
+                        .matchedGeometryEffect(id: Self.morphID, in: morph)
+                        .transition(.opacity)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: collapsedAlignment)
+        }
+    }
+
+    private func expandedCard(
+        content: RecordingRouteChip.Content,
+        missed: Bool,
+        rerouting: Bool,
+        maneuver: UpcomingManeuver?
+    ) -> some View {
+        let showsBanner = missed || rerouting || maneuver != nil
+        return VStack(spacing: 0) {
+            HStack(spacing: 6 * heightScale) {
+                RecordingRouteChip(
+                    content: content,
+                    action: action,
+                    wide: true,
+                    embedded: true,
+                    heightScale: heightScale
+                )
+                .frame(maxWidth: .infinity)
+                Button {
+                    setCollapsed(true)
+                } label: {
+                    Image(systemName: "arrow.down.right.and.arrow.up.left")
+                        .font(.system(size: 11 * heightScale, weight: .bold))
+                        .foregroundStyle(Color.white)
+                        .frame(width: Self.collapseSide, height: Self.collapseSide)
+                        .background { TrailhoundTintCapsule() }
+                        .contentShape(Circle())
+                }
+                .buttonStyle(.glassPlainHit)
+                .accessibilityLabel(L10n.string("recording.live_map.route.hide"))
+                .accessibilityIdentifier("liveMap.route.collapse")
+            }
+            .padding(.horizontal, 8 * heightScale)
+            .padding(.top, 8 * heightScale)
+            .padding(.bottom, showsBanner ? 6 * heightScale : 8 * heightScale)
+            if showsBanner {
+                Rectangle()
+                    .fill(Color.white.opacity(colorScheme == .dark ? 0.16 : 0.35))
+                    .frame(height: 0.5)
+                    .padding(.horizontal, 12)
+                banner(missed: missed, rerouting: rerouting, maneuver: maneuver)
+                    .padding(.horizontal, 10 * heightScale)
+                    .padding(.top, 6 * heightScale)
+                    .padding(.bottom, 8 * heightScale)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .clipShape(shape)
+        .liveMapHUDPlate(shape)
+    }
+
+    /// Same tint disc as the destination row, inside one HUD glass plate. The glyph is the card's state.
+    /// With an estimate the plate is a chip: the red minutes left and the distance. Otherwise a circle.
+    private func collapsedButton(
+        content: RecordingRouteChip.Content,
+        missed: Bool,
+        rerouting: Bool,
+        maneuver: UpcomingManeuver?
+    ) -> some View {
+        let side = GlassTokens.toolbarControlCircleSide
+        let disc = ZStack {
+            TrailhoundTintCapsule()
+                .frame(width: Self.collapsedDiscSide, height: Self.collapsedDiscSide)
+            if rerouting || content == .loading {
+                ProgressView()
+                    .controlSize(.small)
+                    .tint(Color.white)
+            } else {
+                Image(systemName: collapsedSymbol(content: content, missed: missed, maneuver: maneuver))
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(Color.white)
+            }
+        }
+        return Button {
+            setCollapsed(false)
+        } label: {
+            if case let .estimate(distance, countdown, _) = content {
+                HStack(spacing: 8) {
+                    disc
+                    HStack(spacing: 0) {
+                        Text(countdown)
+                            .foregroundStyle(RecordingRouteChip.countdownInk)
+                        Text(" · \(distance)")
+                            .foregroundStyle(bannerInk)
+                    }
+                    .font(.system(size: 14, weight: .bold))
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .fixedSize()
+                }
+                .padding(.leading, (side - Self.collapsedDiscSide) / 2)
+                .padding(.trailing, 14)
+                .frame(height: side)
+                .contentShape(Capsule())
+                .liveMapHUDPlate(Capsule(), interactive: true)
+                .trailhoundTapRipple(Capsule())
+            } else {
+                disc
+                    .frame(width: side, height: side)
+                    .contentShape(Circle())
+                    .liveMapHUDPlate(Circle(), interactive: true)
+                    .trailhoundTapRipple(Circle())
+            }
+        }
+        .buttonStyle(.glassPlainHit)
+        .accessibilityLabel(L10n.string("recording.live_map.route.show"))
+        .accessibilityValue(collapsedAccessibilityValue(content))
+        .accessibilityIdentifier("liveMap.route.expand")
+    }
+
+    private func collapsedAccessibilityValue(_ content: RecordingRouteChip.Content) -> String {
+        guard case let .estimate(distance, countdown, _) = content else { return "" }
+        return "\(countdown), \(distance)"
+    }
+
+    private func collapsedSymbol(
+        content: RecordingRouteChip.Content,
+        missed: Bool,
+        maneuver: UpcomingManeuver?
+    ) -> String {
+        if missed { return "arrow.turn.up.right" }
+        if let maneuver { return ManeuverIcon.systemImage(for: maneuver.instruction) }
+        switch content {
+        case .setDestination: return "flag.fill"
+        case .offline: return "wifi.slash"
+        case .failed: return "exclamationmark.triangle.fill"
+        case .loading, .estimate: return "flag.checkered"
+        }
+    }
+
+    private static let collapseSide: CGFloat = 30
+    private static let collapsedDiscSide: CGFloat = 34
+
+    /// The live map turns animations off; this flag lets the morph through.
+    private func setCollapsed(_ collapsed: Bool) {
+        TrailhoundHaptics.selection()
+        var transaction = Transaction(
+            animation: reduceMotion
+                ? nil
+                : (collapsed ? TrailhoundMotion.liveMapHintCollapse : TrailhoundMotion.liveMapHintPop)
+        )
+        transaction[LiveFollowSheetTransition.self] = true
+        withTransaction(transaction) {
+            isCollapsed = collapsed
+        }
+    }
+
+    @ViewBuilder
+    private func banner(missed: Bool, rerouting: Bool, maneuver: UpcomingManeuver?) -> some View {
+        VStack(spacing: 4) {
+            if missed {
+                bannerRow(
+                    L10n.string("recording.live_map.route.missed_turn"),
+                    systemImage: "arrow.turn.up.right",
+                    showsProgress: false,
+                    identifier: "liveMap.route.missed"
+                )
+            }
+            if rerouting {
+                bannerRow(
+                    L10n.string("recording.live_map.route.rerouting"),
+                    systemImage: nil,
+                    showsProgress: true,
+                    identifier: "liveMap.route.rerouting"
+                )
+            }
+            if let maneuver {
+                bannerRow(
+                    String(
+                        format: L10n.string("recording.live_map.route.maneuver"),
+                        DateFormatters.formatManeuverDistance(maneuver.distanceMeters),
+                        maneuver.instruction
+                    ),
+                    systemImage: ManeuverIcon.systemImage(for: maneuver.instruction),
+                    showsProgress: false,
+                    identifier: "liveMap.route.maneuver",
+                    lineLimit: 2
+                )
+            }
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private func bannerRow(
+        _ title: String,
+        systemImage: String?,
+        showsProgress: Bool,
+        identifier: String,
+        lineLimit: Int = 1
+    ) -> some View {
+        HStack(alignment: .center, spacing: 6) {
+            if showsProgress {
+                ProgressView()
+                    .controlSize(.mini)
+            } else if let systemImage {
+                Image(systemName: systemImage)
+                    .font(.system(size: 12 * heightScale, weight: .semibold))
+                    .foregroundStyle(bannerInk)
+            }
+            Text(title)
+                .font(.system(size: 11 * heightScale + 2, weight: .semibold))
+                .foregroundStyle(bannerInk)
+                .multilineTextAlignment(.center)
+                .lineLimit(lineLimit)
+                .minimumScaleFactor(0.85)
+                .frame(maxWidth: .infinity)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier(identifier)
+    }
+}
+
+/// Glanceable notes: the next turn, or a missed turn and the recalculation under it.
+/// Not buttons: nothing to tap while moving.
+struct LiveFollowRouteNotices: View {
+    var missedTurn: Bool
+    var isRerouting: Bool
+    var maneuver: UpcomingManeuver? = nil
+
+    var body: some View {
+        if missedTurn || isRerouting || maneuver != nil {
+            VStack(alignment: .center, spacing: 4) {
+                if missedTurn {
+                    notice(
+                        L10n.string("recording.live_map.route.missed_turn"),
+                        systemImage: "arrow.turn.up.right",
+                        showsProgress: false,
+                        identifier: "liveMap.route.missed"
+                    )
+                }
+                if isRerouting {
+                    notice(
+                        L10n.string("recording.live_map.route.rerouting"),
+                        systemImage: nil,
+                        showsProgress: true,
+                        identifier: "liveMap.route.rerouting"
+                    )
+                }
+                if let maneuver, !missedTurn, !isRerouting {
+                    notice(
+                        String(
+                            format: L10n.string("recording.live_map.route.maneuver"),
+                            DateFormatters.formatManeuverDistance(maneuver.distanceMeters),
+                            maneuver.instruction
+                        ),
+                        systemImage: ManeuverIcon.systemImage(for: maneuver.instruction),
+                        showsProgress: false,
+                        identifier: "liveMap.route.maneuver",
+                        lineLimit: 2
+                    )
+                    .frame(maxWidth: 280)
+                }
+            }
+            .fixedSize(horizontal: true, vertical: true)
+        }
+    }
+
+    private func notice(
+        _ title: String,
+        systemImage: String?,
+        showsProgress: Bool,
+        identifier: String,
+        lineLimit: Int = 1
+    ) -> some View {
+        HStack(alignment: .top, spacing: 4) {
+            if showsProgress {
+                ProgressView()
+                    .controlSize(.mini)
+            } else if let systemImage {
+                Image(systemName: systemImage)
+                    .font(.caption2.weight(.semibold))
+            }
+            Text(title)
+                .font(.caption2.weight(.bold))
+                .lineLimit(lineLimit)
+                .minimumScaleFactor(0.8)
+                .multilineTextAlignment(.leading)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .glassChrome(cornerRadius: 14)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier(identifier)
+    }
+}
+
+/// Reads the planned-route store in its own body, so a remaining-distance change re-renders
+/// this chip and not the whole live map.
+struct LiveFollowRouteChipHost: View {
+    var plannedRoute: PlannedRouteStore
+    var action: () -> Void
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 30)) { context in
+            RecordingRouteChip(
+                content: Self.content(for: plannedRoute, now: context.date),
+                action: action,
+                wide: true
+            )
+        }
+    }
+
+    static func content(for store: PlannedRouteStore, now: Date) -> RecordingRouteChip.Content {
+        guard store.destination != nil else { return .setDestination }
+        switch store.status {
+        case .idle, .loading:
+            return .loading
+        case .offline:
+            return .offline
+        case .failed:
+            return .failed
+        case .ready:
+            if store.showsRecalculatingETA {
+                return .loading
+            }
+            guard let meters = store.remainingMeters, let time = store.displayedRemaining(at: now) else {
+                return .loading
+            }
+            return .estimate(
+                distance: DateFormatters.formatDistance(meters),
+                countdown: LiveFollowCountdown.label(seconds: time),
+                arrival: DateFormatters.tripTime.string(from: now.addingTimeInterval(time))
+            )
+        }
+    }
+}
+
+/// Remaining minutes on the destination button. Whole minutes, at least one while any time is left.
+enum LiveFollowCountdown {
+    static func label(seconds: TimeInterval) -> String {
+        let minutes = max(seconds > 0 ? 1 : 0, Int((seconds / 60).rounded()))
+        if minutes < 60 {
+            return String(format: L10n.string("recording.live_map.route.minutes"), minutes)
+        }
+        let hours = minutes / 60
+        let remain = minutes % 60
+        if remain == 0 {
+            return String(format: L10n.string("recording.live_map.route.hours"), hours)
+        }
+        return String(format: L10n.string("recording.live_map.route.hours_minutes"), hours, remain)
     }
 }
 

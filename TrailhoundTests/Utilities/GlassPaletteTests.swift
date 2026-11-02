@@ -31,27 +31,35 @@ final class GlassPaletteTests: XCTestCase {
         XCTAssertEqual(GlassSemantic.destructive(for: .light), LightGlassPalette.destructive)
     }
 
-    func testRecordingSegmentThumbContrastsWithCard() {
-        XCTAssertEqual(RecordingSegmentChrome.thumb, Color.white)
+    func testRecordingSegmentThumbUsesPaletteTint() {
         XCTAssertEqual(
-            RecordingSegmentChrome.label(isSelected: true, palette: .forest),
-            ShellPalette.forest.chromeColor(for: .light)
-        )
-        XCTAssertNotEqual(
-            RecordingSegmentChrome.label(isSelected: true, palette: .forest),
-            ShellPalette.forest.tintColor(for: .light)
-        )
-        XCTAssertEqual(
-            RecordingSegmentChrome.label(isSelected: false, palette: .forest),
-            Color.white.opacity(0.78)
-        )
-        XCTAssertNotEqual(
-            RecordingSegmentChrome.trackFill(for: .light),
+            RecordingSegmentChrome.thumb(for: .forest, scheme: .light),
             ShellPalette.forest.tintColor(for: .light)
         )
         XCTAssertNotEqual(
-            RecordingSegmentChrome.trackFill(for: .light),
-            RecordingSegmentChrome.trackFill(for: .dark)
+            RecordingSegmentChrome.thumb(for: .forest, scheme: .light),
+            RecordingSegmentChrome.thumb(for: .rose, scheme: .light)
+        )
+        let selected = RecordingSegmentChrome.selectedLabel(palette: .forest, scheme: .light)
+        XCTAssertTrue(
+            selected == ShellPalette.forest.chromeColor(for: .light) || selected == Color.white
+        )
+        XCTAssertEqual(
+            RecordingSegmentChrome.label(
+                isSelected: false,
+                palette: .forest,
+                scheme: .light,
+                reduceTransparency: false
+            ),
+            LiveFollowHUDInk.secondary(scheme: .light, palette: .forest, reduceTransparency: false)
+        )
+        XCTAssertEqual(
+            LiveFollowHUDInk.primary(scheme: .light, palette: .sky, reduceTransparency: false),
+            ShellPalette.sky.chromeColor(for: .light)
+        )
+        XCTAssertEqual(
+            LiveFollowHUDInk.primary(scheme: .light, palette: .sky, reduceTransparency: true),
+            Color.white
         )
     }
 

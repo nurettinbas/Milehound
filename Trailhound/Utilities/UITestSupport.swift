@@ -1,3 +1,4 @@
+import CoreLocation
 import Foundation
 import SwiftData
 import UIKit
@@ -53,7 +54,48 @@ enum UITestSupport {
 
     static let odometerCareSeedVehicleID = UUID(uuidString: "aaaaaaaa-0000-4000-8000-000000000024")!
 
-    /// Other UI tests tap Start and must not stop on the one-time driving notice.
+    /// Live-map planned route: a saved place, a fake straight-line route provider, and a
+    /// fixed origin when the simulator has no GPS fix.
+    static var seedsPlannedRoute: Bool {
+        #if DEBUG
+        ProcessInfo.processInfo.arguments.contains("-UITesting.plannedRouteSeed")
+        #else
+        false
+        #endif
+    }
+
+    /// Pretends the car is moving at 15 m/s so destination search locks.
+    static var plannedRouteSpeedOverrideMps: Double? {
+        #if DEBUG
+        ProcessInfo.processInfo.arguments.contains("-UITesting.plannedRouteMoving") ? 15 : nil
+        #else
+        nil
+        #endif
+    }
+
+    static let plannedRouteSeedPlaceID = UUID(uuidString: "aaaaaaaa-0000-4000-8000-0000000000d5")!
+    static let plannedRouteSeedOrigin = CLLocationCoordinate2D(latitude: 41.0082, longitude: 28.9784)
+
+    /// Closed landscape cover on a phone simulator. The journal detail uses the corner card.
+    static var forcesClosedCoverLandscape: Bool {
+        #if DEBUG
+        ProcessInfo.processInfo.arguments.contains("-UITesting.closedCover")
+        #else
+        false
+        #endif
+    }
+
+    static let journalCoverSeedID = UUID(uuidString: "aaaaaaaa-0000-4000-8000-0000000000c1")!
+    static let journalCoverTripID = UUID(uuidString: "aaaaaaaa-0000-4000-8000-0000000000c2")!
+
+    static var seedsJournalCover: Bool {
+        #if DEBUG
+        ProcessInfo.processInfo.arguments.contains("-UITesting.journalCoverSeed")
+        #else
+        false
+        #endif
+    }
+
     static var showsDrivingSafetyNotice: Bool {
         #if DEBUG
         ProcessInfo.processInfo.arguments.contains("-UITesting.drivingNoticeSeed")
@@ -129,7 +171,61 @@ enum UITestSupport {
         if seedsOdometerCare {
             seedOdometerCareFixtures(in: context)
         }
+        if seedsPlannedRoute {
+            seedPlannedRouteFixtures(in: context)
+        }
+        if seedsJournalCover {
+            seedJournalCoverFixtures(in: context)
+        }
         try? context.save()
+    }
+
+    @MainActor
+    static func seedPlannedRouteFixtures(in context: ModelContext) {
+        let seedID = plannedRouteSeedPlaceID
+        var existing = FetchDescriptor<SavedPlace>(predicate: #Predicate { $0.id == seedID })
+        existing.fetchLimit = 1
+        if (try? context.fetch(existing).first) != nil { return }
+        context.insert(
+            SavedPlace(
+                id: seedID,
+                name: "Route Seed Office",
+                latitude: 41.0422,
+                longitude: 29.0083,
+                radiusMeters: 200,
+                kind: .work
+            )
+        )
+    }
+
+    @MainActor
+    static func seedJournalCoverFixtures(in context: ModelContext) {
+        let seedID = journalCoverSeedID
+        var existing = FetchDescriptor<TravelJournal>(predicate: #Predicate { $0.id == seedID })
+        existing.fetchLimit = 1
+        if (try? context.fetch(existing).first) != nil { return }
+        let anchor = Date(timeIntervalSince1970: 1_700_000_000)
+        let journal = TravelJournal(
+            id: seedID,
+            title: "Cover Seed",
+            startedOn: anchor,
+            endedOn: anchor.addingTimeInterval(3_600),
+            note: "Seaside",
+            tripCount: 1,
+            distanceMeters: 12_000
+        )
+        let trip = Trip(
+            id: journalCoverTripID,
+            startedAt: anchor,
+            endedAt: anchor.addingTimeInterval(3_600),
+            distanceMeters: 12_000,
+            startPlaceName: "Home",
+            endPlaceName: "Office",
+            journal: journal
+        )
+        context.insert(journal)
+        context.insert(trip)
+        journal.trips = [trip]
     }
 
     @MainActor

@@ -34,6 +34,19 @@ final class LiveFollowSession {
         recordingService?.liveBreadcrumbSegments ?? []
     }
 
+    /// Change stamp for the planned route line. Same display-tick read as `routeVersion`.
+    var plannedRouteVersion: Int {
+        recordingService?.plannedRoute.version ?? 0
+    }
+
+    var plannedRouteCoordinates: [CLLocationCoordinate2D] {
+        recordingService?.plannedRoute.route?.coordinates ?? []
+    }
+
+    var plannedRouteDestination: CLLocationCoordinate2D? {
+        recordingService?.plannedRoute.destination?.coordinate
+    }
+
     @ObservationIgnored var isPaused = false
     @ObservationIgnored var isFollowing = true
     @ObservationIgnored var openSettled = false

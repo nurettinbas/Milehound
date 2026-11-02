@@ -16,7 +16,9 @@ Nurettin Baş — [nurettin.bas@icloud.com](mailto:nurettin.bas@icloud.com)
 
 **Tutarı oku** özelliği Apple’ın cihaz üzerindeki metin tanıma (Vision) teknolojisini kullanır. Fotoğraf ve okunan metin iPhone’unda işlenir; Trailhound’a, bir yapay zekâ servisine ya da herhangi bir sunucuya gönderilmez.
 
-Konum yalnızca yolculuk kaydı için kullanılır ve sen tanı raporunu e-postayla göndermedikçe cihazdan çıkmaz. O rapor da koordinat, adres, yer adı, araç adı, fotoğraf veya not içermez.
+Konum yalnızca yolculuk kaydı için kullanılır ve sen tanı raporunu e-postayla göndermedikçe Trailhound’a ulaşmaz. O rapor da koordinat, adres, yer adı, araç adı, fotoğraf veya not içermez.
+
+**Harita ve yol tarifi (Apple MapKit):** Harita görüntüsü, yer araması, yolculuk başı ve sonundaki sokak adları ve canlı haritadaki **planlanan yol** Apple’ın MapKit hizmetinden gelir. Canlı haritada bir varış noktası seçtiğinde, sürüş tarifi almak için o anki konumun ve varış noktası Apple’a gönderilir. Apple’ın yanıtındaki sıradaki dönüş ve mesafesi haritada gösterilir ve kaydedilmez. Yer araması yazdığında aranan metin ve harita bölgesi Apple’a gider. Bu istekler iPhone’undan doğrudan Apple’a, [Apple’ın gizlilik politikası](https://www.apple.com/tr/legal/privacy/) kapsamında gider. Arada Trailhound sunucusu yoktur; Trailhound bu verileri almaz. Varış noktası ve planlanan yol kaydedilmez; yalnızca o kayıt sürerken bellekte tutulur ve kayıt bitince silinir.
 
 Bu veriler geliştirici tarafından işlenmez; kontrol tamamen sendedir.
 
@@ -78,6 +80,6 @@ Trailhound bir sürüş günlüğüdür ve çocuklara yönelik değildir. Hiç k
 
 Bu metin değişirse yeni sürüm aynı adreste, güncellenmiş tarihle yayımlanır.
 
-_Son güncelleme: 29 Ekim 2026_
+_Son güncelleme: 1 Kasım 2026_
 
 Ayrıca bkz. [Destek](SUPPORT.md) ve [Teşekkürler](ACKNOWLEDGEMENTS.md).

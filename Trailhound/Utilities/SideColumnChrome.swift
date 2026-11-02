@@ -157,6 +157,8 @@ final class SideColumnChromeState {
     private(set) var windowSize: CGSize = .zero
     private(set) var safeInsets: UIEdgeInsets = .zero
     private(set) var tabBarFrame: CGRect?
+    /// Visible glass pill of a side tab. Nil for a bottom tab or before it is found.
+    private(set) var sidePillFrame: CGRect?
     private(set) var layoutDirection: LayoutDirection = .leftToRight
     private(set) var statusClusterMaxY: CGFloat?
 
@@ -177,12 +179,14 @@ final class SideColumnChromeState {
         windowSize: CGSize,
         safeInsets: UIEdgeInsets,
         tabBarFrame: CGRect?,
+        sidePillFrame: CGRect? = nil,
         layoutDirection: LayoutDirection,
         statusClusterMaxY: CGFloat?
     ) {
         if self.windowSize != windowSize { self.windowSize = windowSize }
         if self.safeInsets != safeInsets { self.safeInsets = safeInsets }
         if !sameFrame(self.tabBarFrame, tabBarFrame) { self.tabBarFrame = tabBarFrame }
+        if !sameFrame(self.sidePillFrame, sidePillFrame) { self.sidePillFrame = sidePillFrame }
         if self.layoutDirection != layoutDirection { self.layoutDirection = layoutDirection }
         if self.statusClusterMaxY != statusClusterMaxY { self.statusClusterMaxY = statusClusterMaxY }
     }

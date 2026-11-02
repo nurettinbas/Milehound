@@ -10,9 +10,21 @@ import UIKit
 /// bitmap, so the stroke fattens toward the bottom of a 3D view and seams while panning).
 enum LiveFollowRouteStrokeStyle {
     static let solidWidth: CGFloat = 7.2
+    /// White edge showing on each side of the traveled trail.
+    static let casingInset: CGFloat = 1.8
+    static var casingWidth: CGFloat { solidWidth + casingInset * 2 }
 
     static func solidColor(for palette: ShellPalette, scheme: ColorScheme) -> UIColor {
         UIColor(palette.tintColor(for: scheme))
+    }
+
+    static func applyCasing(to renderer: MKOverlayPathRenderer) {
+        renderer.strokeColor = .white
+        renderer.lineWidth = casingWidth
+        renderer.lineCap = .round
+        renderer.lineJoin = .round
+        renderer.miterLimit = 1
+        renderer.lineDashPattern = nil
     }
 
     static func apply(to renderer: MKOverlayPathRenderer, color: UIColor) {
@@ -21,6 +33,298 @@ enum LiveFollowRouteStrokeStyle {
         renderer.lineCap = .round
         renderer.lineJoin = .round
         renderer.miterLimit = 1
+        renderer.lineDashPattern = nil
+    }
+
+    /// Paints `overlay` by its role: the traveled trail solid, the planned route a lighter road.
+    static func apply(to renderer: MKOverlayPathRenderer, for overlay: MKOverlay, color: UIColor) {
+        switch LiveFollowOverlayRole.of(overlay) {
+        case .traveled:
+            apply(to: renderer, color: color)
+        case .casing:
+            applyCasing(to: renderer)
+        case .planned:
+            LiveFollowPlannedRouteStrokeStyle.apply(to: renderer, color: color)
+        }
+    }
+}
+
+/// Road still ahead: one solid line, the trail's width, the theme tint lightened toward
+/// white. Opaque, so it stays visible on the road. A second stroke separates in 3D.
+enum LiveFollowPlannedRouteStrokeStyle {
+    static let width: CGFloat = LiveFollowRouteStrokeStyle.solidWidth
+    /// Share of the way from the theme tint toward white.
+    static let lighten: CGFloat = 0.30
+
+    static func apply(to renderer: MKOverlayPathRenderer, color: UIColor) {
+        renderer.strokeColor = lightened(color)
+        renderer.lineWidth = width
+        // Chunks and the lead share a vertex; round caps would overlap there as darker dots.
+        renderer.lineCap = .butt
+        renderer.lineJoin = .round
+        renderer.miterLimit = 1
+        renderer.lineDashPattern = nil
+    }
+
+    static func lightened(_ color: UIColor) -> UIColor {
+        let resolved = color.resolvedColor(with: .current)
+        var red: CGFloat = 0
+        var green: CGFloat = 0
+        var blue: CGFloat = 0
+        var alpha: CGFloat = 0
+        guard resolved.getRed(&red, green: &green, blue: &blue, alpha: &alpha) else { return color }
+        return UIColor(
+            red: red + (1 - red) * lighten,
+            green: green + (1 - green) * lighten,
+            blue: blue + (1 - blue) * lighten,
+            alpha: 1
+        )
+    }
+}
+
+/// Planned route line. Its own type so the trail restyle never paints it solid.
+final class PlannedRoutePolyline: MKPolyline {}
+
+/// Geometry for the road still ahead. The route is cut into fixed chunks that are uploaded
+/// once and dropped as the car passes them. A short lead line runs from the puck's centre
+/// and eases onto the route centreline, so the plan leaves the car exactly where the trail
+/// ends even when GPS sits a lane or a carriageway off Apple's line. Only the lead is
+/// swapped while driving. Lengths are in map points.
+enum LiveFollowPlannedAhead {
+    /// Farther than this from the line, the cut holds still (off route, or a parallel road).
+    static let toleranceMeters: CLLocationDistance = 75
+    /// The search only looks this far ahead of the last cut, so a later part of the route
+    /// that runs close by (a U-turn, the other carriageway) can never jump the cut forward.
+    static let windowMeters: CLLocationDistance = 400
+    /// Farther than this from the line, the lead lets go of the puck. A longer bridge is the
+    /// snake that reaches back to a turn the car has left.
+    static let attachMeters: CLLocationDistance = 35
+    /// The lead eases from the puck onto the route over this distance.
+    static let blendMeters: CLLocationDistance = 80
+    /// Sample spacing inside the blend, so the ease is a curve and not one long chord.
+    static let blendStepMeters: CLLocationDistance = 8
+    /// Vertices per fixed chunk. Neighbours share their boundary vertex.
+    static let chunkPoints = 32
+
+    static func chunkCount(pointCount: Int) -> Int {
+        pointCount < 2 ? 0 : (pointCount - 2) / chunkPoints + 1
+    }
+
+    static func chunkStartVertex(_ chunk: Int) -> Int {
+        chunk * chunkPoints
+    }
+
+    static func chunk(_ chunk: Int, of points: [MKMapPoint]) -> ArraySlice<MKMapPoint> {
+        let start = chunkStartVertex(chunk)
+        let end = min(start + chunkPoints, points.count - 1)
+        return points[start...end]
+    }
+
+    /// First chunk drawn as a fixed overlay: it starts at least `blendMeters` past the cut.
+    /// Returns `chunkCount` when the lead reaches the end of the route on its own.
+    static func firstFixedChunk(along: Double, cumulative: [Double], metersPerPoint: Double) -> Int {
+        let count = chunkCount(pointCount: cumulative.count)
+        let target = along + blendMeters / max(metersPerPoint, .leastNonzeroMagnitude)
+        var chunk = 0
+        while chunk < count, cumulative[chunkStartVertex(chunk)] < target {
+            chunk += 1
+        }
+        return chunk
+    }
+
+    /// Point on the route `along` map points from its start, walking forward from `segment`.
+    private static func point(
+        at along: Double,
+        points: [MKMapPoint],
+        cumulative: [Double],
+        segment: inout Int
+    ) -> MKMapPoint {
+        while segment < points.count - 2, cumulative[segment + 1] < along {
+            segment += 1
+        }
+        let a = points[segment]
+        let b = points[segment + 1]
+        let length = cumulative[segment + 1] - cumulative[segment]
+        let t = length > 0 ? min(1, max(0, (along - cumulative[segment]) / length)) : 0
+        return MKMapPoint(x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t)
+    }
+
+    /// Lead line from the car to `endVertex`. Starts on `vehicle` (the puck centre) and eases
+    /// onto the route over `blendMeters`; nil `vehicle` starts on the route itself.
+    static func lead(
+        vehicle: MKMapPoint?,
+        segment: Int,
+        along: Double,
+        points: [MKMapPoint],
+        cumulative: [Double],
+        endVertex: Int,
+        metersPerPoint: Double
+    ) -> [MKMapPoint] {
+        guard points.count >= 2, cumulative.count == points.count else { return [] }
+        let last = points.count - 1
+        let end = min(max(endVertex, 0), last)
+        let endAlong = cumulative[end]
+        guard endAlong > along else { return [] }
+        var walk = min(max(segment, 0), points.count - 2)
+        let origin = point(at: along, points: points, cumulative: cumulative, segment: &walk)
+        let offsetX = vehicle.map { $0.x - origin.x } ?? 0
+        let offsetY = vehicle.map { $0.y - origin.y } ?? 0
+        let blend = blendMeters / max(metersPerPoint, .leastNonzeroMagnitude)
+        let step = blendStepMeters / max(metersPerPoint, .leastNonzeroMagnitude)
+
+        var stations: [Double] = []
+        var s = along
+        while s < min(along + blend, endAlong) {
+            stations.append(s)
+            s += step
+        }
+        var vertex = min(max(segment, 0), last) + 1
+        while vertex <= end {
+            if cumulative[vertex] > along + blend {
+                stations.append(cumulative[vertex])
+            }
+            vertex += 1
+        }
+        if stations.last.map({ $0 < endAlong }) ?? true {
+            stations.append(endAlong)
+        }
+
+        walk = min(max(segment, 0), points.count - 2)
+        var result: [MKMapPoint] = []
+        result.reserveCapacity(stations.count)
+        for station in stations {
+            let base = point(at: station, points: points, cumulative: cumulative, segment: &walk)
+            let u = blend > 0 ? min(1, (station - along) / blend) : 1
+            let weight = 0.5 * (1 + cos(Double.pi * u))
+            result.append(MKMapPoint(x: base.x + offsetX * weight, y: base.y + offsetY * weight))
+        }
+        return result
+    }
+
+    static func cumulative(_ points: [MKMapPoint]) -> [Double] {
+        guard !points.isEmpty else { return [] }
+        var result: [Double] = [0]
+        result.reserveCapacity(points.count)
+        for index in 1..<points.count {
+            let a = points[index - 1]
+            let b = points[index]
+            result.append(result[index - 1] + hypot(b.x - a.x, b.y - a.y))
+        }
+        return result
+    }
+
+    /// The lead holds the puck only while the car is still on the road. Past `attachMeters`,
+    /// or pointed away from it while already well off the centreline, the line stays on the
+    /// route instead of stretching back to the car.
+    static func attachesLead(
+        distanceMeters: CLLocationDistance,
+        course: CLLocationDirection,
+        routeBearing: CLLocationDirection
+    ) -> Bool {
+        if distanceMeters > attachMeters { return false }
+        if distanceMeters > 18,
+           course >= 0,
+           routeBearing >= 0,
+           PlannedRouteProgress.angleDelta(course, routeBearing) >= PlannedRouteProgress.missedTurnDegrees
+        {
+            return false
+        }
+        return true
+    }
+
+    /// Next cut from `fromSegment` onward, or nil when the vehicle is not on the line.
+    /// `recover` scans past the window. Only the moment a route is loaded uses it, so a
+    /// missed turn cannot jump the cut onto a later stretch and erase the line in between.
+    /// A valid `course` lets a following cut that fell behind the window (backgrounded, paused,
+    /// GPS gap) catch up, but only onto a stretch the car is on and driving along. Otherwise
+    /// the passed road keeps its planned line beside the trail.
+    static func advance(
+        vehicle: MKMapPoint,
+        points: [MKMapPoint],
+        cumulative: [Double],
+        fromSegment: Int,
+        recover: Bool = false,
+        course: CLLocationDirection = -1
+    ) -> (segment: Int, along: Double, distanceMeters: CLLocationDistance)? {
+        guard points.count >= 2, cumulative.count == points.count, let total = cumulative.last, total > 0 else {
+            return nil
+        }
+        let metersPerPoint = MKMetersPerMapPointAtLatitude(vehicle.coordinate.latitude)
+        guard metersPerPoint > 0 else { return nil }
+        let tolerance = toleranceMeters / metersPerPoint
+        let first = min(max(0, fromSegment), points.count - 2)
+        let windowEnd = cumulative[first] + windowMeters / metersPerPoint
+        func project(_ index: Int) -> (along: Double, distance: Double) {
+            let a = points[index]
+            let b = points[index + 1]
+            let dx = b.x - a.x
+            let dy = b.y - a.y
+            let lengthSquared = dx * dx + dy * dy
+            let t = lengthSquared > 0
+                ? min(1, max(0, ((vehicle.x - a.x) * dx + (vehicle.y - a.y) * dy) / lengthSquared))
+                : 0
+            let distance = hypot(a.x + dx * t - vehicle.x, a.y + dy * t - vehicle.y)
+            return (cumulative[index] + (cumulative[index + 1] - cumulative[index]) * t, distance)
+        }
+        var best: (segment: Int, along: Double, distance: Double)?
+        var index = first
+        while index < points.count - 1, cumulative[index] <= windowEnd {
+            let hit = project(index)
+            if hit.distance <= tolerance, hit.distance < (best?.distance ?? .infinity) {
+                best = (index, hit.along, hit.distance)
+            }
+            index += 1
+        }
+        if let best {
+            return (best.segment, best.along, best.distance * metersPerPoint)
+        }
+        // The car is past the window: the map was reopened after a long drive, or GPS dropped
+        // out. Pick up the first stretch ahead that the car is on, and refine from there.
+        // While already following, a loose miss stays a miss — scanning here is what made the
+        // line leap to a later part of the route and vanish in between.
+        guard recover else {
+            guard course >= 0 else { return nil }
+            let snug = attachMeters / metersPerPoint
+            while index < points.count - 1 {
+                let bearing = PlannedRouteProgress.bearing(points[index].coordinate, points[index + 1].coordinate)
+                if bearing >= 0,
+                   PlannedRouteProgress.angleDelta(course, bearing) < PlannedRouteProgress.missedTurnDegrees,
+                   project(index).distance <= snug
+                {
+                    return advance(vehicle: vehicle, points: points, cumulative: cumulative, fromSegment: index)
+                }
+                index += 1
+            }
+            return nil
+        }
+        while index < points.count - 1 {
+            if project(index).distance <= tolerance {
+                return advance(
+                    vehicle: vehicle,
+                    points: points,
+                    cumulative: cumulative,
+                    fromSegment: index,
+                    recover: true
+                )
+            }
+            index += 1
+        }
+        return nil
+    }
+}
+
+/// White edge under the traveled trail. Its own type so it is never restyled as the trail.
+final class TrailCasingPolyline: MKPolyline {}
+
+enum LiveFollowOverlayRole: Equatable {
+    case traveled
+    case casing
+    case planned
+
+    static func of(_ overlay: MKOverlay) -> LiveFollowOverlayRole {
+        if overlay is PlannedRoutePolyline { return .planned }
+        if overlay is TrailCasingPolyline { return .casing }
+        return .traveled
     }
 }
 
@@ -195,6 +499,7 @@ struct LiveFollowMapKitView: UIViewRepresentable {
         context.coordinator.bindSession()
         context.coordinator.installGestureBreak(on: map)
         context.coordinator.syncRouteIfNeeded(on: map)
+        context.coordinator.syncPlannedRouteIfNeeded(on: map)
         if let pose = session.pose {
             context.coordinator.applyCamera(pose, on: map)
         }
@@ -241,6 +546,7 @@ struct LiveFollowMapKitView: UIViewRepresentable {
         }
 
         context.coordinator.syncRouteIfNeeded(on: mapView)
+        context.coordinator.syncPlannedRouteIfNeeded(on: mapView)
         if pauseChanged {
             applyInteractionLock(on: mapView, paused: isPaused)
             context.coordinator.refreshTipForPauseChange(on: mapView)
@@ -304,8 +610,22 @@ struct LiveFollowMapKitView: UIViewRepresentable {
         private var lastTipVehicle: CLLocationCoordinate2D?
         private var lastTipWriteAt: CFTimeInterval = 0
         private var tipOverlay: MKPolyline?
+        private var tipCasing: TrailCasingPolyline?
         private var lastCommittedPieces: [[CLLocationCoordinate2D]] = []
         private var lastRouteVersion = Int.min
+        private var plannedChunks: [Int: PlannedRoutePolyline] = [:]
+        private var plannedLead: PlannedRoutePolyline?
+        private var plannedDistanceMeters: CLLocationDistance = 0
+        private var lastPlannedRouteVersion = Int.min
+        private var plannedPoints: [MKMapPoint] = []
+        private var plannedCumulative: [Double] = []
+        private var plannedSegment = 0
+        private var plannedAlong: Double = 0
+        private var plannedFirstFixed = 0
+        private var lastPlannedLeadAt: CFTimeInterval = 0
+        private var lastPlannedLeadVehicle: MKMapPoint?
+        /// Last car position the lead was considered for, whether or not the line held the puck.
+        private var lastPlannedSample: MKMapPoint?
         /// Uncommitted remainder of the growing run — rendered in the tip overlay, so a
         /// new breadcrumb never swaps a history polyline (that 1 Hz remove+add next to
         /// the puck is what read as the route being "glued on in pieces").
@@ -371,6 +691,7 @@ struct LiveFollowMapKitView: UIViewRepresentable {
 
         private static let historyChunkPoints = 240
         private var historyChunks: [HistoryChunkKey: MKPolyline] = [:]
+        private var historyCasings: [HistoryChunkKey: TrailCasingPolyline] = [:]
         private var historyChunkCounts: [HistoryChunkKey: Int] = [:]
 
         /// Hard ceiling of 10 Hz on tip geometry swaps. The puck itself still moves every
@@ -378,6 +699,14 @@ struct LiveFollowMapKitView: UIViewRepresentable {
         /// puck artwork, and far cheaper than churning the overlay set.
         private static let tipRefreshInterval: CFTimeInterval = 0.10
         private static let tipRefreshMeters: CLLocationDistance = 0.8
+
+        /// MapKit fades a newly added overlay in over roughly a quarter second. Dropping the
+        /// stroke it replaces in the same pass leaves the trail half transparent for that
+        /// fade — invisible under the puck up close, a pale flash along the whole trail when
+        /// zoomed out. Replaced trail overlays stay under their successor this long.
+        private static let trailRetireDelay: CFTimeInterval = 0.45
+        private var retiredTrail: [(overlay: MKOverlay, at: CFTimeInterval)] = []
+        private var retireFlushScheduled = false
 
         init(
             session: LiveFollowSession,
@@ -452,6 +781,8 @@ struct LiveFollowMapKitView: UIViewRepresentable {
                 // Breadcrumbs land here, inside the camera transaction — never through
                 // a SwiftUI body pass (which cost a re-render + updateUIView per fix).
                 self.syncRouteIfNeeded(on: map)
+                self.syncPlannedRouteIfNeeded(on: map)
+                self.updatePlannedAhead(vehicle: vehicle, on: map)
                 self.updateRouteTip(vehicle: vehicle, on: map)
                 CATransaction.commit()
             }
@@ -509,8 +840,15 @@ struct LiveFollowMapKitView: UIViewRepresentable {
                 guard !drawingSuspended else { return }
                 drawingSuspended = true
                 map.removeOverlays(map.overlays)
+                retiredTrail.removeAll()
                 tipOverlay = nil
+                tipCasing = nil
+                plannedChunks.removeAll()
+                plannedLead = nil
+                lastPlannedRouteVersion = .min
+                resetPlannedAhead(points: [])
                 historyChunks.removeAll()
+                historyCasings.removeAll()
                 historyChunkCounts.removeAll()
                 tailPoints = []
                 lastCommittedPieces = []
@@ -532,6 +870,7 @@ struct LiveFollowMapKitView: UIViewRepresentable {
             map.isHidden = false
             if resume {
                 syncRouteIfNeeded(on: map)
+                syncPlannedRouteIfNeeded(on: map)
             }
         }
 
@@ -542,6 +881,172 @@ struct LiveFollowMapKitView: UIViewRepresentable {
             guard version != lastRouteVersion else { return }
             lastRouteVersion = version
             syncRoute(session.routeSegments, on: map)
+        }
+
+        /// Planned route at the bottom of `.aboveRoads`, so the traveled trail and its tip
+        /// always draw over it. Fixed chunks are rebuilt only for a new route or a reroute.
+        func syncPlannedRouteIfNeeded(on map: MKMapView) {
+            guard !drawingSuspended else { return }
+            let version = session.plannedRouteVersion
+            guard version != lastPlannedRouteVersion else { return }
+            lastPlannedRouteVersion = version
+            let previous: [MKOverlay] = plannedOverlays()
+            plannedChunks.removeAll()
+            plannedLead = nil
+            let coordinates = session.plannedRouteCoordinates
+            if coordinates.count >= 2 {
+                resetPlannedAhead(points: coordinates.map { MKMapPoint($0) })
+                var vehicle = session.vehicleCoordinate
+                if let car = vehicle, !advancePlannedCut(to: MKMapPoint(car), recover: true) {
+                    vehicle = nil
+                } else if let car = vehicle, !leadHoldsPuck(MKMapPoint(car)) {
+                    vehicle = nil
+                }
+                let metersPerPoint = MKMetersPerMapPointAtLatitude(coordinates[0].latitude)
+                plannedFirstFixed = LiveFollowPlannedAhead.firstFixedChunk(
+                    along: plannedAlong,
+                    cumulative: plannedCumulative,
+                    metersPerPoint: metersPerPoint
+                )
+                let count = LiveFollowPlannedAhead.chunkCount(pointCount: plannedPoints.count)
+                for index in plannedFirstFixed..<max(plannedFirstFixed, count) {
+                    insertPlannedChunk(index, on: map)
+                }
+                replacePlannedLead(vehicle: vehicle.map { MKMapPoint($0) }, on: map)
+            } else {
+                resetPlannedAhead(points: [])
+            }
+            if !previous.isEmpty {
+                map.removeOverlays(previous)
+            }
+        }
+
+        private func resetPlannedAhead(points: [MKMapPoint]) {
+            plannedPoints = points
+            plannedCumulative = LiveFollowPlannedAhead.cumulative(points)
+            plannedSegment = 0
+            plannedAlong = 0
+            plannedFirstFixed = 0
+            plannedDistanceMeters = 0
+            lastPlannedLeadAt = 0
+            lastPlannedLeadVehicle = nil
+            lastPlannedSample = nil
+        }
+
+        private func plannedOverlays() -> [MKOverlay] {
+            var overlays: [MKOverlay] = Array(plannedChunks.values)
+            if let plannedLead {
+                overlays.append(plannedLead)
+            }
+            return overlays
+        }
+
+        /// Moves the cut forward to the car. False when the car is off the line.
+        /// `recover` is only for a route that was just loaded, with the cut back at the start.
+        @discardableResult
+        private func advancePlannedCut(to vehicle: MKMapPoint, recover: Bool) -> Bool {
+            guard let cut = LiveFollowPlannedAhead.advance(
+                vehicle: vehicle,
+                points: plannedPoints,
+                cumulative: plannedCumulative,
+                fromSegment: plannedSegment,
+                recover: recover,
+                course: session.vehicleHeadingDegrees
+            ) else { return false }
+            plannedDistanceMeters = cut.distanceMeters
+            if cut.along > plannedAlong {
+                plannedSegment = cut.segment
+                plannedAlong = cut.along
+            }
+            return true
+        }
+
+        private func leadHoldsPuck(_ vehicle: MKMapPoint) -> Bool {
+            let index = min(max(0, plannedSegment), max(0, plannedPoints.count - 2))
+            let bearing = plannedPoints.count >= 2
+                ? PlannedRouteProgress.bearing(
+                    plannedPoints[index].coordinate,
+                    plannedPoints[index + 1].coordinate
+                )
+                : -1
+            return LiveFollowPlannedAhead.attachesLead(
+                distanceMeters: plannedDistanceMeters,
+                course: session.vehicleHeadingDegrees,
+                routeBearing: bearing
+            )
+        }
+
+        private func insertPlannedChunk(_ index: Int, on map: MKMapView) {
+            let chunk = Array(LiveFollowPlannedAhead.chunk(index, of: plannedPoints))
+            guard chunk.count >= 2 else { return }
+            let line = PlannedRoutePolyline(points: chunk, count: chunk.count)
+            plannedChunks[index] = line
+            map.insertOverlay(line, at: 0, level: .aboveRoads)
+        }
+
+        /// Follows the car on the tip's 10 Hz gate: drops fixed chunks the car has passed and
+        /// swaps the short lead line. Fixed chunks are never re-uploaded while driving.
+        private func updatePlannedAhead(vehicle: CLLocationCoordinate2D?, on map: MKMapView) {
+            guard !plannedPoints.isEmpty, let vehicle, !isPaused else { return }
+            let now = CACurrentMediaTime()
+            guard now - lastPlannedLeadAt >= Self.tipRefreshInterval else { return }
+            let point = MKMapPoint(vehicle)
+            let metersPerPoint = MKMetersPerMapPointAtLatitude(vehicle.latitude)
+            if let last = lastPlannedSample,
+               hypot(point.x - last.x, point.y - last.y) * metersPerPoint < Self.tipRefreshMeters
+            {
+                return
+            }
+            lastPlannedLeadAt = now
+            lastPlannedSample = point
+            let onRoute = advancePlannedCut(to: point, recover: false)
+            let firstFixed = LiveFollowPlannedAhead.firstFixedChunk(
+                along: plannedAlong,
+                cumulative: plannedCumulative,
+                metersPerPoint: metersPerPoint
+            )
+            if firstFixed > plannedFirstFixed {
+                let passed = (plannedFirstFixed..<firstFixed).compactMap { plannedChunks.removeValue(forKey: $0) }
+                plannedFirstFixed = firstFixed
+                if !passed.isEmpty {
+                    map.removeOverlays(passed)
+                }
+            }
+            let holdsPuck = onRoute && leadHoldsPuck(point)
+            if holdsPuck {
+                replacePlannedLead(vehicle: point, on: map)
+            } else if onRoute || lastPlannedLeadVehicle != nil {
+                // Left the road: the line stays on the route. It does not stretch back to the car.
+                replacePlannedLead(vehicle: nil, on: map)
+            }
+        }
+
+        private func replacePlannedLead(vehicle: MKMapPoint?, on map: MKMapView) {
+            let endVertex = plannedFirstFixed < LiveFollowPlannedAhead.chunkCount(pointCount: plannedPoints.count)
+                ? LiveFollowPlannedAhead.chunkStartVertex(plannedFirstFixed)
+                : plannedPoints.count - 1
+            let latitude = (vehicle ?? plannedPoints.first)?.coordinate.latitude ?? 0
+            let points = LiveFollowPlannedAhead.lead(
+                vehicle: vehicle,
+                segment: plannedSegment,
+                along: plannedAlong,
+                points: plannedPoints,
+                cumulative: plannedCumulative,
+                endVertex: endVertex,
+                metersPerPoint: MKMetersPerMapPointAtLatitude(latitude)
+            )
+            lastPlannedLeadVehicle = vehicle
+            let previous = plannedLead
+            if points.count >= 2 {
+                let next = PlannedRoutePolyline(points: points, count: points.count)
+                plannedLead = next
+                map.insertOverlay(next, at: 0, level: .aboveRoads)
+            } else {
+                plannedLead = nil
+            }
+            if let previous {
+                map.removeOverlay(previous)
+            }
         }
 
         func syncRoute(_ pieces: [[CLLocationCoordinate2D]], on map: MKMapView) {
@@ -595,18 +1100,62 @@ struct LiveFollowMapKitView: UIViewRepresentable {
             replaceTipOverlay(points, on: map)
         }
 
-        /// Adds the replacement before dropping the old overlay so the stroke never blinks.
+        /// The old stroke stays under the replacement until its fade-in is over, so it never blinks.
         private func replaceTipOverlay(_ points: [CLLocationCoordinate2D]?, on map: MKMapView) {
             let previous = tipOverlay
+            let previousCasing = tipCasing
             if let points, points.count >= 2 {
+                let casing = TrailCasingPolyline(coordinates: points, count: points.count)
+                tipCasing = casing
+                addTrailCasing(casing, on: map)
                 let next = MKPolyline(coordinates: points, count: points.count)
                 tipOverlay = next
                 map.addOverlay(next, level: .aboveRoads)
             } else {
                 tipOverlay = nil
+                tipCasing = nil
             }
-            if let previous {
-                map.removeOverlay(previous)
+            retireTrailOverlays([previous, previousCasing].compactMap { $0 }, on: map)
+        }
+
+        /// Under every traveled stroke, not on top of the stroke it replaces: a white edge
+        /// fading in over the old trail reads as the trail flashing pale.
+        private func addTrailCasing(_ casing: TrailCasingPolyline, on map: MKMapView) {
+            if let lowestTrail = map.overlays(in: .aboveRoads).first(where: {
+                LiveFollowOverlayRole.of($0) == .traveled
+            }) {
+                map.insertOverlay(casing, below: lowestTrail)
+            } else {
+                map.addOverlay(casing, level: .aboveRoads)
+            }
+        }
+
+        private func retireTrailOverlays(_ overlays: [MKOverlay], on map: MKMapView) {
+            let now = CACurrentMediaTime()
+            flushRetiredTrail(on: map, now: now)
+            guard !overlays.isEmpty else { return }
+            retiredTrail.append(contentsOf: overlays.map { (overlay: $0, at: now) })
+            scheduleRetiredTrailFlush()
+        }
+
+        private func flushRetiredTrail(on map: MKMapView, now: CFTimeInterval) {
+            let expired = retiredTrail.prefix { now - $0.at >= Self.trailRetireDelay }
+            guard !expired.isEmpty else { return }
+            map.removeOverlays(expired.map { $0.overlay })
+            retiredTrail.removeFirst(expired.count)
+        }
+
+        /// Pause and a stopped car stop the tip swaps, so expired strokes need their own pass.
+        private func scheduleRetiredTrailFlush() {
+            guard !retireFlushScheduled, let oldest = retiredTrail.first else { return }
+            retireFlushScheduled = true
+            let wait = max(0, oldest.at + Self.trailRetireDelay - CACurrentMediaTime()) + 0.02
+            DispatchQueue.main.asyncAfter(deadline: .now() + wait) { [weak self] in
+                guard let self else { return }
+                self.retireFlushScheduled = false
+                guard let map = self.mapView else { return }
+                self.flushRetiredTrail(on: map, now: CACurrentMediaTime())
+                self.scheduleRetiredTrailFlush()
             }
         }
 
@@ -637,14 +1186,16 @@ struct LiveFollowMapKitView: UIViewRepresentable {
                     let count = end - start + 1
                     if historyChunkCounts[key] != count {
                         let slice = Array(coordinates[start...end])
+                        let casing = TrailCasingPolyline(coordinates: slice, count: slice.count)
                         let line = MKPolyline(coordinates: slice, count: slice.count)
                         let previous = historyChunks[key]
+                        let previousCasing = historyCasings[key]
+                        historyCasings[key] = casing
                         historyChunks[key] = line
                         historyChunkCounts[key] = count
+                        addTrailCasing(casing, on: map)
                         map.addOverlay(line, level: .aboveRoads)
-                        if let previous {
-                            map.removeOverlay(previous)
-                        }
+                        retireTrailOverlays([previous, previousCasing].compactMap { $0 }, on: map)
                     }
 
                     start = end
@@ -654,7 +1205,11 @@ struct LiveFollowMapKitView: UIViewRepresentable {
 
             for (key, overlay) in historyChunks where !liveKeys.contains(key) {
                 map.removeOverlay(overlay)
+                if let casing = historyCasings[key] {
+                    map.removeOverlay(casing)
+                }
                 historyChunks.removeValue(forKey: key)
+                historyCasings.removeValue(forKey: key)
                 historyChunkCounts.removeValue(forKey: key)
             }
 
@@ -674,7 +1229,8 @@ struct LiveFollowMapKitView: UIViewRepresentable {
             let pieces = LiveFollowGrowingRoute.historyPieces(from: lastCommittedPieces)
             let rect = LiveFollowGrowingRoute.overviewMapRect(
                 historyPieces: pieces,
-                vehicle: session.vehicleCoordinate ?? LiveFollowGrowingRoute.tipAnchor(from: lastCommittedPieces)
+                vehicle: session.vehicleCoordinate ?? LiveFollowGrowingRoute.tipAnchor(from: lastCommittedPieces),
+                destination: session.plannedRouteDestination
             )
             guard !rect.isNull else { return }
             let size = map.bounds.size
@@ -1062,7 +1618,7 @@ struct LiveFollowMapKitView: UIViewRepresentable {
         func refreshRouteStroke(on map: MKMapView) {
             for overlay in map.overlays {
                 guard let renderer = map.renderer(for: overlay) as? MKOverlayPathRenderer else { continue }
-                LiveFollowRouteStrokeStyle.apply(to: renderer, color: routeStrokeColor)
+                LiveFollowRouteStrokeStyle.apply(to: renderer, for: overlay, color: routeStrokeColor)
                 renderer.setNeedsDisplay()
             }
         }
@@ -1073,7 +1629,7 @@ struct LiveFollowMapKitView: UIViewRepresentable {
             }
             if let line = overlay as? MKPolyline {
                 let renderer = MKPolylineRenderer(polyline: line)
-                LiveFollowRouteStrokeStyle.apply(to: renderer, color: routeStrokeColor)
+                LiveFollowRouteStrokeStyle.apply(to: renderer, for: overlay, color: routeStrokeColor)
                 return renderer
             }
             return MKOverlayRenderer(overlay: overlay)
@@ -1420,6 +1976,7 @@ final class LiveFollowPinAnnotationView: MKAnnotationView {
             switch annotation.kind {
             case .start: return .start
             case .pause, .tripStop: return .stop
+            case .destination: return .end
             }
         }()
         let pinImage = RouteMapPinImage.uiImage(for: routeKind)
@@ -1432,6 +1989,7 @@ final class LiveFollowPinAnnotationView: MKAnnotationView {
             case .start: return L10n.string("recording.live_map.start_pin")
             case .pause: return L10n.string("recording.live_map.pause_pin")
             case .tripStop: return L10n.tripPointStop
+            case .destination: return L10n.string("recording.live_map.destination_pin")
             }
         }()
     }

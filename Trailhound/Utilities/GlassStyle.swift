@@ -46,6 +46,43 @@ enum GlassTokens {
     static let morphPanelEdgeInset: CGFloat = 8
     /// Concentric with the display corner once inset by `morphPanelEdgeInset`.
     static let morphPanelCornerRadius: CGFloat = 44
+    /// Display corner the morph panel matches. A control inset further subtracts its own margin.
+    static var displayCornerRadius: CGFloat { morphPanelCornerRadius + morphPanelEdgeInset }
+
+    /// Corner radius that stays concentric with the display when the view is `edgeInset` from the screen.
+    static func concentricCornerRadius(edgeInset: CGFloat) -> CGFloat {
+        max(0, displayCornerRadius - edgeInset)
+    }
+
+    /// Travel detail on the closed landscape cover. Compact stays within a third of the screen.
+    enum TravelCornerCardMetrics {
+        static let compactMaxWidth: CGFloat = 300
+        static let compactMinWidth: CGFloat = 220
+        /// The cover card is 1.25 × 1.15 of the third-of-screen base.
+        static let compactWidthScale: CGFloat = 1.4375
+        /// Gap between the card and the side tab. Tighter than `panelHorizontalInset`.
+        static let tabGap: CGFloat = 4
+        static let expandedWidthFraction: CGFloat = 0.42
+        static let expandedMaxWidth: CGFloat = 360
+        /// Grown card stays in the lower portion. The map above it keeps the rest.
+        static let expandedMaxHeightFraction: CGFloat = 0.55
+
+        /// A third of the screen, capped at `compactMaxWidth` (the 220 pt floor applies only when a
+        /// third is already that wide), then scaled by `compactWidthScale`.
+        static func compactWidth(screenWidth: CGFloat) -> CGFloat {
+            let third = screenWidth / 3
+            let base = third >= compactMinWidth ? min(third, compactMaxWidth) : max(0, third)
+            return base * compactWidthScale
+        }
+
+        static func expandedWidth(screenWidth: CGFloat) -> CGFloat {
+            min(max(0, screenWidth) * expandedWidthFraction, expandedMaxWidth)
+        }
+
+        static func expandedHeight(screenHeight: CGFloat) -> CGFloat {
+            max(0, screenHeight) * expandedMaxHeightFraction
+        }
+    }
     /// Panel scale when it starts to grow, and when it finishes shrinking.
     static let morphPanelOpenScale: CGFloat = 0.4
     static let morphPanelCloseScale: CGFloat = 0.55
@@ -134,6 +171,11 @@ enum GlassTokens {
             return Color.white.opacity(0.28)
         }
         return Color.white.opacity(0.72)
+    }
+
+    /// Palette tint for the live-map HUD Liquid Glass. Light enough that HUD ink keeps its contrast over the road.
+    static func liveMapGlassTint(for scheme: ColorScheme, palette: ShellPalette) -> Color {
+        palette.tintColor(for: scheme).opacity(scheme == .dark ? 0.22 : 0.14)
     }
 }
 
@@ -654,6 +696,79 @@ struct GlassCardModifier: ViewModifier {
     }
 }
 
+/// One Liquid Glass card anchored in a screen corner. The corner that meets the display
+/// uses a radius concentric with that display; the other three use `cardRadius`.
+struct GlassCornerCard<Content: View>: View {
+    /// Bottom-trailing in left-to-right. Bottom-leading when false.
+    var anchorsTrailing: Bool = true
+    var contentInset: CGFloat = GlassTokens.cardContentInset
+    @ViewBuilder var content: () -> Content
+
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.colorSchemeContrast) private var contrast
+    @Environment(\.shellPalette) private var shellPalette
+    @Environment(\.glassForcesSolidPlate) private var glassForcesSolidPlate
+
+    private var outerRadius: CGFloat {
+        GlassTokens.concentricCornerRadius(edgeInset: GlassTokens.panelHorizontalInset)
+    }
+
+    private var shape: UnevenRoundedRectangle {
+        let inner = GlassTokens.cardRadius
+        let outer = outerRadius
+        if anchorsTrailing {
+            return UnevenRoundedRectangle(
+                topLeadingRadius: inner,
+                bottomLeadingRadius: inner,
+                bottomTrailingRadius: outer,
+                topTrailingRadius: inner,
+                style: .continuous
+            )
+        }
+        return UnevenRoundedRectangle(
+            topLeadingRadius: inner,
+            bottomLeadingRadius: outer,
+            bottomTrailingRadius: inner,
+            topTrailingRadius: inner,
+            style: .continuous
+        )
+    }
+
+    var body: some View {
+        let plateFrozen = glassForcesSolidPlate
+        let engine = GlassEngineResolver.resolve(
+            scheme: colorScheme,
+            reduceTransparency: reduceTransparency,
+            frozen: plateFrozen,
+            allowsNative: true
+        )
+        let padded = content()
+            .padding(.horizontal, contentInset)
+            .padding(.vertical, contentInset)
+
+        if #available(iOS 26.0, *), engine == .native {
+            padded.modifier(
+                NativeGlassBackgroundModifier(
+                    shape: shape,
+                    palette: shellPalette,
+                    increasedContrast: contrast == .increased
+                )
+            )
+        } else {
+            padded
+                .background {
+                    GlassSurface(
+                        cornerRadius: outerRadius,
+                        density: .panel,
+                        frozen: plateFrozen
+                    )
+                }
+                .clipShape(shape)
+        }
+    }
+}
+
 struct GlassChromeModifier: ViewModifier {
     var cornerRadius: CGFloat = GlassTokens.chipRadius
     var frozen: Bool = false
@@ -662,12 +777,14 @@ struct GlassChromeModifier: ViewModifier {
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.colorSchemeContrast) private var contrast
     @Environment(\.shellPalette) private var shellPalette
+    @Environment(\.glassForcesSolidPlate) private var glassForcesSolidPlate
 
     func body(content: Content) -> some View {
+        let plateFrozen = frozen || glassForcesSolidPlate
         let engine = GlassEngineResolver.resolve(
             scheme: colorScheme,
             reduceTransparency: reduceTransparency,
-            frozen: frozen,
+            frozen: plateFrozen,
             allowsNative: true
         )
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
@@ -682,7 +799,7 @@ struct GlassChromeModifier: ViewModifier {
         } else {
             content
                 .background {
-                    GlassSurface(cornerRadius: cornerRadius, density: .chrome, frozen: frozen)
+                    GlassSurface(cornerRadius: cornerRadius, density: .chrome, frozen: plateFrozen)
                 }
                 .clipShape(shape)
         }
@@ -2600,6 +2717,29 @@ private struct GlassCollapsingPlateModifier: ViewModifier {
             if natural != height {
                 natural = height
             }
+        }
+    }
+}
+
+extension View {
+    /// Marks the control a sheet zooms out of. Pair with `.glassSheetZoom(from:in:)` on the sheet.
+    @ViewBuilder
+    func glassSheetZoomSource(id: some Hashable, in namespace: Namespace.ID) -> some View {
+        if #available(iOS 18.0, *) {
+            matchedTransitionSource(id: id, in: namespace)
+        } else {
+            self
+        }
+    }
+
+    /// The sheet grows out of its source control and shrinks back into it on dismiss, including
+    /// the interactive swipe. iOS 17 keeps the system slide-up.
+    @ViewBuilder
+    func glassSheetZoom(from id: some Hashable, in namespace: Namespace.ID) -> some View {
+        if #available(iOS 18.0, *) {
+            navigationTransition(.zoom(sourceID: id, in: namespace))
+        } else {
+            self
         }
     }
 }

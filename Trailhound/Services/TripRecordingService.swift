@@ -100,6 +100,8 @@ final class TripRecordingService {
     private(set) var liveBreadcrumbSegments: [[CLLocationCoordinate2D]] = []
     /// Parking / user-pause stops for the active session (live follow map pins).
     private(set) var liveStopCoordinates: [CLLocationCoordinate2D] = []
+    /// Live-map destination and planned route. Memory only; cleared when the session ends.
+    let plannedRoute = PlannedRouteStore()
 
     /// Throttled snapshots for on-screen recording UI (see `RecordingDisplaySampler`).
     private(set) var displayElapsedTime: TimeInterval = 0
@@ -517,6 +519,7 @@ final class TripRecordingService {
         }
 
         applyDistanceSample(from: location, speed: speed)
+        plannedRoute.noteVehicle(location.coordinate, course: location.course, speed: location.speed)
         refreshTripStartedPlaceBodyIfNeeded(coordinate: location.coordinate)
         refreshDisplaySnapshot()
         syncExternalState()
@@ -867,6 +870,7 @@ final class TripRecordingService {
         liveBreadcrumbCoordinates = []
         liveBreadcrumbSegments = []
         liveStopCoordinates = []
+        plannedRoute.clear()
         resetDisplaySnapshot()
 
         let trip = Trip(startedAt: resolvedStartedAt)
@@ -1270,6 +1274,7 @@ final class TripRecordingService {
         liveBreadcrumbCoordinates = []
         liveBreadcrumbSegments = []
         liveStopCoordinates = []
+        plannedRoute.clear()
         didRefreshTripStartedPlaceBody = false
         resetDisplaySnapshot()
     }

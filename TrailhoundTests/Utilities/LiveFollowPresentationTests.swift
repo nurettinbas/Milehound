@@ -34,6 +34,34 @@ final class LiveFollowPresentationTests: XCTestCase {
         )
     }
 
+    func testHUDColumnWidthCapsTheCoverAndThePane() {
+        XCTAssertEqual(
+            LiveFollowPresentation.hudColumnWidth(containerWidth: 390, landscapeCover: false, fillsPane: false),
+            LiveFollowPresentation.compactHUDWidthCap,
+            accuracy: 0.01
+        )
+        XCTAssertEqual(
+            LiveFollowPresentation.hudColumnWidth(containerWidth: 320, landscapeCover: false, fillsPane: false),
+            320 * 8 / 12,
+            accuracy: 0.01
+        )
+        XCTAssertEqual(
+            LiveFollowPresentation.hudColumnWidth(containerWidth: 844, landscapeCover: true, fillsPane: false),
+            LiveFollowPresentation.landscapeCoverHUDWidthCap,
+            accuracy: 0.01
+        )
+        XCTAssertEqual(
+            LiveFollowPresentation.hudColumnWidth(containerWidth: 800, landscapeCover: false, fillsPane: true),
+            LiveFollowPresentation.paneHUDWidthCap,
+            accuracy: 0.01
+        )
+        XCTAssertEqual(
+            LiveFollowPresentation.hudColumnWidth(containerWidth: 360, landscapeCover: false, fillsPane: true),
+            LiveFollowPresentation.compactHUDWidthCap,
+            accuracy: 0.01
+        )
+    }
+
     func testSettledHUDRectCenteredBottom() {
         let settled = LiveFollowPresentation.settledHUDRect(in: container, hudHeight: 112)
         XCTAssertEqual(settled.width, 390 * 8 / 12, accuracy: 0.01)

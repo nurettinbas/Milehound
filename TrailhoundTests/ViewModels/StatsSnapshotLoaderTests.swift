@@ -223,7 +223,10 @@ final class StatsSnapshotLoaderTests: XCTestCase {
         let container = try ModelContainerFactory.makeInMemory()
         let context = container.mainContext
         let calendar = Calendar.current
-        let end = calendar.startOfDay(for: Date())
+        // Mid-month anchor: the goal ring follows the month of `customEnd`.
+        // Trips a few days before `Date()` fall into the previous month on the 1st–3rd.
+        let anchor = calendar.date(from: DateComponents(year: 2026, month: 6, day: 15, hour: 12))!
+        let end = calendar.startOfDay(for: anchor)
         let start = calendar.date(byAdding: .day, value: -120, to: end)!
         let inMonth = end.addingTimeInterval(-2 * 86_400).addingTimeInterval(3_600)
 

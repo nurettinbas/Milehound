@@ -28,9 +28,13 @@ enum TravelJournalPanelLayout {
         return min(max(preferred, minimum), ceiling)
     }
 
-    static func expandedHeight(containerHeight: CGFloat, mapPeek: CGFloat) -> CGFloat {
+    static func expandedHeight(
+        containerHeight: CGFloat,
+        mapPeek: CGFloat,
+        fraction: CGFloat = expandedHeightFraction
+    ) -> CGFloat {
         guard containerHeight > 0 else { return 0 }
-        let preferred = containerHeight * expandedHeightFraction
+        let preferred = containerHeight * fraction
         let capped = max(0, containerHeight - max(mapPeek, 0))
         return min(preferred, capped)
     }
@@ -40,7 +44,8 @@ enum TravelJournalPanelLayout {
         containerHeight: CGFloat,
         mapPeek: CGFloat,
         compactFraction: CGFloat = compactHeightFraction,
-        compactFloor: CGFloat = compactMinimum
+        compactFloor: CGFloat = compactMinimum,
+        expandedFraction: CGFloat = expandedHeightFraction
     ) -> CGFloat {
         switch detent {
         case .compact:
@@ -50,7 +55,11 @@ enum TravelJournalPanelLayout {
                 minimum: compactFloor
             )
         case .expanded:
-            return expandedHeight(containerHeight: containerHeight, mapPeek: mapPeek)
+            return expandedHeight(
+                containerHeight: containerHeight,
+                mapPeek: mapPeek,
+                fraction: expandedFraction
+            )
         }
     }
 
@@ -61,20 +70,26 @@ enum TravelJournalPanelLayout {
         containerHeight: CGFloat,
         mapPeek: CGFloat,
         compactFraction: CGFloat = compactHeightFraction,
-        compactFloor: CGFloat = compactMinimum
+        compactFloor: CGFloat = compactMinimum,
+        expandedFraction: CGFloat = expandedHeightFraction
     ) -> CGFloat {
         let compact = compactHeight(
             containerHeight: containerHeight,
             fraction: compactFraction,
             minimum: compactFloor
         )
-        let expanded = expandedHeight(containerHeight: containerHeight, mapPeek: mapPeek)
+        let expanded = expandedHeight(
+            containerHeight: containerHeight,
+            mapPeek: mapPeek,
+            fraction: expandedFraction
+        )
         let base = height(
             for: detent,
             containerHeight: containerHeight,
             mapPeek: mapPeek,
             compactFraction: compactFraction,
-            compactFloor: compactFloor
+            compactFloor: compactFloor,
+            expandedFraction: expandedFraction
         )
         return clampedHeight(base - translation, compact: compact, expanded: expanded)
     }
@@ -89,20 +104,26 @@ enum TravelJournalPanelLayout {
         containerHeight: CGFloat,
         mapPeek: CGFloat,
         compactFraction: CGFloat = compactHeightFraction,
-        compactFloor: CGFloat = compactMinimum
+        compactFloor: CGFloat = compactMinimum,
+        expandedFraction: CGFloat = expandedHeightFraction
     ) -> TravelJournalPanelDetent {
         let compact = compactHeight(
             containerHeight: containerHeight,
             fraction: compactFraction,
             minimum: compactFloor
         )
-        let expanded = expandedHeight(containerHeight: containerHeight, mapPeek: mapPeek)
+        let expanded = expandedHeight(
+            containerHeight: containerHeight,
+            mapPeek: mapPeek,
+            fraction: expandedFraction
+        )
         let base = height(
             for: detent,
             containerHeight: containerHeight,
             mapPeek: mapPeek,
             compactFraction: compactFraction,
-            compactFloor: compactFloor
+            compactFloor: compactFloor,
+            expandedFraction: expandedFraction
         )
         let projected = clampedHeight(base - predictedTranslation, compact: compact, expanded: expanded)
         let mid = (compact + expanded) / 2
@@ -123,8 +144,20 @@ enum TravelJournalMapFit {
         bottomChrome: CGFloat,
         sheetHeight: CGFloat,
         trailingCover: CGFloat,
-        homeIndicator: CGFloat
+        homeIndicator: CGFloat,
+        coverCardWidth: CGFloat = 0,
+        coverCardHeight: CGFloat = 0,
+        coverCardIsTrailing: Bool = true
     ) -> UIEdgeInsets {
+        if coverCardWidth > 0, !mapExpanded {
+            let horizontal = max(mapSize.width * 0.06, 16)
+            let cardSide = coverCardWidth + GlassTokens.TravelCornerCardMetrics.tabGap
+            let top = max(topChrome, 54)
+            let bottom = max(coverCardHeight, 0) + GlassTokens.panelHorizontalInset + max(homeIndicator, 12)
+            let leading = horizontal + (coverCardIsTrailing ? 0 : cardSide)
+            let trailing = horizontal + (coverCardIsTrailing ? cardSide : 0) + max(trailingCover, 0)
+            return UIEdgeInsets(top: top, left: leading, bottom: bottom, right: trailing)
+        }
         if style == .split, !mapExpanded {
             return TripDetailMapFraming.edgeInsets(
                 TripDetailMapFraming.Input(
@@ -179,6 +212,10 @@ struct TravelJournalDetailView: View {
     @Environment(\.trailhoundLayout) private var layout
     @Environment(\.layoutDirection) private var layoutDirection
     @State private var journalPanelCollapsed = false
+    @State private var cornerCardExpanded = false
+    @State private var coverCardMeasuredHeight: CGFloat = 0
+    @State private var coverExpandedLimit: CGFloat = 0
+    @State private var coverHeaderBottom: CGFloat?
 
     private var members: [Trip] {
         journal.trips.filter { $0.endedAt != nil }.sorted { $0.startedAt > $1.startedAt }
@@ -221,6 +258,9 @@ struct TravelJournalDetailView: View {
                 Task { await loadRoutes() }
             }
             .onChange(of: panelDetent) { _, _ in
+                scheduleMapRefit(delayMilliseconds: 120)
+            }
+            .onChange(of: cornerCardExpanded) { _, _ in
                 scheduleMapRefit(delayMilliseconds: 120)
             }
     }
@@ -283,6 +323,8 @@ struct TravelJournalDetailView: View {
                         .background { mapSizeReader }
                 }
             }
+        } else if layout.isClosedCoverLandscape {
+            coverCornerMap(in: geometry)
         } else if layout.tripDetailStyle == .floatingPanel {
             TrailhoundMapCanvas(panelCollapsed: $journalPanelCollapsed) {
                 TravelJournalMapLayer(
@@ -344,6 +386,184 @@ struct TravelJournalDetailView: View {
             selectedSegments: selectedSegments,
             cameraBox: cameraBox
         )
+    }
+
+    /// Closed cover, landscape. Same pull-up sheet as the phone, at the corner width.
+    /// It arrives as the summary. Pulling the grabber up lists the trips and can fill the screen.
+    private func coverCornerMap(in geometry: GeometryProxy) -> some View {
+        let anchorsTrailing = layoutDirection != .rightToLeft
+        let width = GlassTokens.TravelCornerCardMetrics.compactWidth(screenWidth: geometry.size.width)
+        let safe = geometry.safeAreaInsets
+        // The card ends on the home-indicator inset, level with the bottom of the punch hole
+        // under the side tab. With the camera at the top, it ends level with the side tab.
+        let homeInset = max(safe.bottom, windowSafeInsets.bottom, 12)
+        let bottomInset: CGFloat = {
+            let chrome = SideColumnChromeState.shared
+            guard let icons = chrome.tabBarFrame,
+                  SideColumnChromeResolver.isSideTabBar(icons) else { return homeInset }
+            let tab = chrome.sidePillFrame ?? icons
+            let tabGap = geometry.frame(in: .global).maxY - tab.maxY
+            guard tabGap > 0 else { return homeInset }
+            return min(homeInset, tabGap)
+        }()
+        // Expanded stops just under the navigation bar. The bar is measured in the window,
+        // because this reader's top inset does not match where the bar ends on the cover.
+        let headerBottom = coverHeaderBottom.map { max($0 - geometry.frame(in: .global).minY, 0) } ?? safe.top
+        let topLimit = headerBottom + 8
+        let compactCard = coverCompactHeight
+        let expandedHeight = max(compactCard + 1, geometry.size.height - topLimit - bottomInset)
+        let dragging = abs(dragTranslation) > 0.5
+        let base = cornerCardExpanded ? expandedHeight : compactCard
+        let liveHeight = min(
+            max(base - dragTranslation, compactCard - TravelJournalPanelLayout.rubberBand),
+            expandedHeight + TravelJournalPanelLayout.rubberBand
+        )
+        let card = coverCornerCard
+            .frame(width: width, height: liveHeight, alignment: .top)
+            .padding(.bottom, bottomInset)
+            .padding(.trailing, anchorsTrailing ? GlassTokens.TravelCornerCardMetrics.tabGap : 0)
+            .padding(.leading, anchorsTrailing ? 0 : GlassTokens.TravelCornerCardMetrics.tabGap)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: anchorsTrailing ? .bottomTrailing : .bottomLeading)
+            .offset(y: panelRisen ? 0 : 28)
+            .opacity(panelRisen && !isMapExpanded ? 1 : 0)
+            .animation(reduceMotion ? nil : TrailhoundMotion.sheetRise, value: panelRisen)
+            .animation(reduceMotion || dragging ? nil : TrailhoundMotion.sheetRise, value: cornerCardExpanded)
+            .animation(reduceMotion ? nil : mapExpandAnimation, value: isMapExpanded)
+            .allowsHitTesting(panelVisible && !isMapExpanded)
+
+        return ZStack {
+            journalMap
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background { mapSizeReader }
+            card
+        }
+        .onAppear {
+            coverExpandedLimit = expandedHeight
+            refreshMapChromeInsets(from: geometry)
+            measureCoverHeader()
+        }
+        .onChange(of: geometry.size) { _, _ in
+            coverExpandedLimit = expandedHeight
+            refreshMapChromeInsets(from: geometry)
+            scheduleMapRefit(animated: false)
+            measureCoverHeader()
+        }
+        .onChange(of: expandedHeight) { _, height in
+            coverExpandedLimit = height
+        }
+    }
+
+    /// Bottom of the visible navigation bar, in window coordinates. Read again after
+    /// the bar settles from a rotation.
+    private func measureCoverHeader() {
+        coverHeaderBottom = visibleNavigationBarBottom() ?? coverHeaderBottom
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(250))
+            if let bottom = visibleNavigationBarBottom() {
+                coverHeaderBottom = bottom
+            }
+        }
+    }
+
+    private func visibleNavigationBarBottom() -> CGFloat? {
+        let window = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap(\.windows)
+            .first(where: \.isKeyWindow)
+        guard let window else { return nil }
+        var bottom: CGFloat?
+        func walk(_ view: UIView) {
+            guard !view.isHidden, view.alpha > 0.01 else { return }
+            if let bar = view as? UINavigationBar {
+                let frame = bar.convert(bar.bounds, to: window)
+                if frame.height > 1, frame.intersects(window.bounds) {
+                    bottom = max(bottom ?? 0, frame.maxY)
+                }
+                return
+            }
+            for subview in view.subviews {
+                walk(subview)
+            }
+        }
+        walk(window)
+        return bottom
+    }
+
+    private var coverCornerCard: some View {
+        let mode: TravelJournalCornerMode = cornerCardExpanded ? .expanded : .compact
+        return TravelJournalEditPanel(
+            journal: journal,
+            trips: members,
+            selectedTripID: selectedTripID,
+            places: places,
+            restHeight: 0,
+            isExpanded: cornerCardExpanded,
+            cornerMode: mode,
+            reduceMotion: reduceMotion,
+            onSelectTrip: { selectedTripID = $0 },
+            onOpenTrip: { TabSelection.shared.appendTrip($0) },
+            onRemoveTrip: removeFromJournal,
+            onEdit: { editorDraft = .edit(journal) },
+            onToggleExpanded: toggleCornerCard,
+            onGrabberDragChanged: { translation in
+                dragTranslation = translation
+            },
+            onGrabberDragEnded: { predicted in
+                snapCornerCard(predictedTranslation: predicted)
+            },
+            onCornerSummaryHeight: noteCoverCardHeight
+        )
+        .background {
+            AtmosphericBackground(style: .lightweight)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: GlassTokens.cardRadius, style: .continuous))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("journal.cornerCard")
+    }
+
+    /// The compact card is the grabber and summary only, never the expanded height.
+    private var coverCompactHeight: CGFloat {
+        coverCardMeasuredHeight > 0 ? coverCardMeasuredHeight : 148
+    }
+
+    /// Records the summary height. Expanded, the summary unwraps the title and note,
+    /// so that taller height must not become the compact height.
+    private func noteCoverCardHeight(_ height: CGFloat) {
+        guard !cornerCardExpanded, height > 0 else { return }
+        guard abs(height - coverCardMeasuredHeight) > 1 else { return }
+        coverCardMeasuredHeight = height
+        scheduleMapRefit(delayMilliseconds: 80)
+    }
+
+    private func toggleCornerCard() {
+        TrailhoundHaptics.selection()
+        withAnimation(reduceMotion ? nil : TrailhoundMotion.sheetRise) {
+            cornerCardExpanded.toggle()
+            dragTranslation = 0
+        }
+    }
+
+    private func snapCornerCard(predictedTranslation: CGFloat) {
+        let compact = coverCompactHeight
+        let expanded = max(coverExpandedLimit, compact + 1)
+        let base = cornerCardExpanded ? expanded : compact
+        let projected = min(max(base - predictedTranslation, compact), expanded)
+        let mid = (compact + expanded) / 2
+        let next: Bool
+        if predictedTranslation < -240 {
+            next = true
+        } else if predictedTranslation > 240 {
+            next = false
+        } else {
+            next = projected >= mid
+        }
+        if next != cornerCardExpanded {
+            TrailhoundHaptics.selection()
+        }
+        withAnimation(reduceMotion ? nil : TrailhoundMotion.sheetRise) {
+            cornerCardExpanded = next
+            dragTranslation = 0
+        }
     }
 
     /// Leading pane on the wide landscape book. One atmosphere, trips open, no sheet plate.
@@ -467,13 +687,24 @@ struct TravelJournalDetailView: View {
         scheduleMapRefit(delayMilliseconds: 80)
     }
 
+    /// Upright Duo, open or the closed cover. The pulled-up list stops at half the page.
+    private var pinsTravelSheetToDuo: Bool {
+        layout.isClosedCoverPortrait
+            || (layout.layoutClass == .duoOpen && layout.tripDetailStyle == .overlay)
+    }
+
     /// Upright Duo card was a tall phone sheet, so the summary sat on a large empty band.
     private var duoCompactFraction: CGFloat {
-        layout.layoutClass == .duoOpen && layout.tripDetailStyle == .overlay ? 0.24 : TravelJournalPanelLayout.compactHeightFraction
+        pinsTravelSheetToDuo ? 0.24 : TravelJournalPanelLayout.compactHeightFraction
+    }
+
+    /// Pulled-up travel sheet on the upright Duo. Half the window, not the phone's 0.72.
+    private var duoExpandedFraction: CGFloat {
+        pinsTravelSheetToDuo ? 0.5 : TravelJournalPanelLayout.expandedHeightFraction
     }
 
     private var duoCompactFloor: CGFloat {
-        layout.layoutClass == .duoOpen && layout.tripDetailStyle == .overlay ? 220 : TravelJournalPanelLayout.compactMinimum
+        pinsTravelSheetToDuo ? 220 : TravelJournalPanelLayout.compactMinimum
     }
 
     private func livePanelHeight(containerHeight: CGFloat, mapPeek: CGFloat) -> CGFloat {
@@ -483,7 +714,8 @@ struct TravelJournalDetailView: View {
             containerHeight: containerHeight,
             mapPeek: mapPeek,
             compactFraction: duoCompactFraction,
-            compactFloor: duoCompactFloor
+            compactFloor: duoCompactFloor,
+            expandedFraction: duoExpandedFraction
         )
     }
 
@@ -506,7 +738,8 @@ struct TravelJournalDetailView: View {
             containerHeight: containerHeight,
             mapPeek: mapPeek,
             compactFraction: duoCompactFraction,
-            compactFloor: duoCompactFloor
+            compactFloor: duoCompactFloor,
+            expandedFraction: duoExpandedFraction
         )
         if next != panelDetent {
             TrailhoundHaptics.selection()
@@ -655,14 +888,29 @@ struct TravelJournalDetailView: View {
             ?? UIEdgeInsets(top: 59, left: 0, bottom: 34, right: 0)
     }
 
+    /// Height of the corner card, so the route centers in the map above it.
+    private var coverCardHeightForFit: CGFloat {
+        guard layout.isClosedCoverLandscape, !isMapExpanded else { return 0 }
+        if cornerCardExpanded { return coverExpandedLimit }
+        return coverCompactHeight
+    }
+
+    /// Width of the corner card, so the route centers in the map beside it.
+    private var coverCardWidthForFit: CGFloat {
+        guard layout.isClosedCoverLandscape, !isMapExpanded else { return 0 }
+        return GlassTokens.TravelCornerCardMetrics.compactWidth(screenWidth: mapViewportSize.width)
+    }
+
     private func applyFittedCamera(animated: Bool) {
         let sheetHeight = TravelJournalPanelLayout.height(
             for: panelDetent,
             containerHeight: mapViewportSize.height,
             mapPeek: mapTopChromePoints + 24,
             compactFraction: duoCompactFraction,
-            compactFloor: duoCompactFloor
+            compactFloor: duoCompactFloor,
+            expandedFraction: duoExpandedFraction
         )
+        let coverWidth = coverCardWidthForFit
         let padding = TravelJournalMapFit.padding(
             style: layout.tripDetailStyle,
             mapExpanded: isMapExpanded,
@@ -671,7 +919,10 @@ struct TravelJournalDetailView: View {
             bottomChrome: mapBottomChromePoints,
             sheetHeight: sheetHeight,
             trailingCover: mapTrailingInset,
-            homeIndicator: mapHomeIndicator
+            homeIndicator: mapHomeIndicator,
+            coverCardWidth: coverWidth,
+            coverCardHeight: coverCardHeightForFit,
+            coverCardIsTrailing: layoutDirection != .rightToLeft
         )
         guard let region = TripDetailViewModel.regionFitting(
             coordinates: fitCoordinates,
@@ -703,3 +954,4 @@ struct TravelJournalDetailView: View {
         }
     }
 }
+

@@ -175,7 +175,9 @@ struct ContentView: View {
     }
 
     private var liveLayout: TrailhoundLayoutSnapshot {
-        let size = windowSize == .zero ? CGSize(width: 390, height: 844) : windowSize
+        let size = windowSize == .zero
+            ? TrailhoundLayoutResolver.currentWindowSize(fallback: CGSize(width: 390, height: 844))
+            : windowSize
         return TrailhoundLayoutResolver.snapshot(
             horizontal: horizontalSizeClass,
             vertical: verticalSizeClass,
@@ -277,7 +279,8 @@ struct ContentView: View {
         UIAccessibility.post(notification: .screenChanged, argument: nil)
     }
 
-    private func publishWindowSize(_ size: CGSize) {
+    private func publishWindowSize(_ proposed: CGSize) {
+        let size = TrailhoundLayoutResolver.currentWindowSize(fallback: proposed)
         guard size != windowSize else { return }
         // The new size can arrive before UIKit's turn. Rebuilding the page then
         // cancels the rotation and the Duo stays landscape, sideways in the hand.

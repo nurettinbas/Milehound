@@ -760,3 +760,202 @@ final class PadLayoutUITests: TrailhoundUITestCase {
         try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .pad, "iPad layout")
     }
 }
+
+/// Live-map planned route: pick a saved place, see remaining distance + arrival, remove it.
+/// `-UITesting.plannedRouteSeed` swaps MapKit for a straight-line provider and seeds "Route Seed Office".
+class LiveMapPlannedRouteUITestCase: TrailhoundUITestCase {
+    override var extraLaunchArguments: [String] { ["-UITesting.plannedRouteSeed"] }
+
+    let seedPlaceIdentifier = "destinationSheet.place.AAAAAAAA-0000-4000-8000-0000000000D5"
+
+    func element(_ identifier: String) -> XCUIElement {
+        app.descendants(matching: .any).matching(identifier: identifier).firstMatch
+    }
+
+    func openLiveMap() throws {
+        XCTAssertTrue(tripsTab.waitForExistence(timeout: uiTimeout))
+        let starts = app.buttons.matching(identifier: "shell.start")
+        let start = starts.allElementsBoundByIndex.first { $0.isHittable } ?? starts.firstMatch
+        XCTAssertTrue(start.waitForExistence(timeout: uiTimeout))
+        start.tap()
+        guard element("recording.live_map.open").waitForExistence(timeout: uiTimeout) else {
+            throw XCTSkip("Recording did not start on this simulator (no location authorization).")
+        }
+        liveMapOpenButton().tap()
+        XCTAssertTrue(element("liveMap.destination").waitForExistence(timeout: uiTimeout))
+        XCTAssertTrue(element("liveMap.pause").waitForExistence(timeout: uiTimeout))
+        XCTAssertTrue(element("liveMap.stop").exists)
+        XCTAssertTrue(element("liveMap.speed").exists)
+    }
+
+    /// The recording card shares the identifier; the map glyph is the smallest match.
+    func liveMapOpenButton() -> XCUIElement {
+        let matches = app.buttons.matching(identifier: "recording.live_map.open").allElementsBoundByIndex
+        return matches.min { $0.frame.width * $0.frame.height < $1.frame.width * $1.frame.height }
+            ?? element("recording.live_map.open")
+    }
+
+    func stopRecording() {
+        let close = element("liveMap.close")
+        if close.waitForExistence(timeout: 5) {
+            close.tap()
+        }
+        let stop = app.buttons["Stop"].firstMatch
+        if stop.waitForExistence(timeout: uiTimeout) {
+            stop.tap()
+        }
+    }
+}
+
+final class LiveMapPlannedRouteUITests: LiveMapPlannedRouteUITestCase {
+    func testLiveMapPlannedRouteShowsEtaAndClears() throws {
+        try openLiveMap()
+        element("liveMap.destination").tap()
+
+        let place = element(seedPlaceIdentifier)
+        XCTAssertTrue(place.waitForExistence(timeout: uiTimeout))
+        XCTAssertTrue(element("destinationSheet.search").exists, "Stopped car: search is open")
+        place.tap()
+
+        let eta = element("liveMap.eta")
+        XCTAssertTrue(eta.waitForExistence(timeout: uiTimeout))
+        eta.tap()
+
+        let clear = element("liveMap.destination.clear")
+        XCTAssertTrue(clear.waitForExistence(timeout: uiTimeout))
+        clear.tap()
+        XCTAssertTrue(element("liveMap.destination").waitForExistence(timeout: uiTimeout))
+        XCTAssertFalse(eta.exists)
+
+        stopRecording()
+    }
+
+    func testDestinationSurvivesClosingTheLiveMap() throws {
+        try openLiveMap()
+        element("liveMap.destination").tap()
+        let place = element(seedPlaceIdentifier)
+        XCTAssertTrue(place.waitForExistence(timeout: uiTimeout))
+        place.tap()
+        XCTAssertTrue(element("liveMap.eta").waitForExistence(timeout: uiTimeout))
+
+        element("liveMap.close").tap()
+        XCTAssertTrue(element("recording.live_map.open").waitForExistence(timeout: uiTimeout))
+        liveMapOpenButton().tap()
+        XCTAssertTrue(element("liveMap.eta").waitForExistence(timeout: uiTimeout))
+
+        stopRecording()
+    }
+
+    func testRouteCardCollapsesAndReopens() throws {
+        try openLiveMap()
+        element("liveMap.destination").tap()
+        let place = element(seedPlaceIdentifier)
+        XCTAssertTrue(place.waitForExistence(timeout: uiTimeout))
+        place.tap()
+        XCTAssertTrue(element("liveMap.eta").waitForExistence(timeout: uiTimeout))
+
+        let collapse = element("liveMap.route.collapse")
+        XCTAssertTrue(collapse.waitForExistence(timeout: uiTimeout))
+        collapse.tap()
+        let expand = element("liveMap.route.expand")
+        XCTAssertTrue(expand.waitForExistence(timeout: uiTimeout))
+        expand.tap()
+        XCTAssertTrue(collapse.waitForExistence(timeout: uiTimeout))
+
+        stopRecording()
+    }
+
+    func testNearbyPlaceSetsTheDestination() throws {
+        try openLiveMap()
+        element("liveMap.destination").tap()
+        let nearby = element("destinationSheet.nearby.0")
+        XCTAssertTrue(nearby.waitForExistence(timeout: uiTimeout))
+        nearby.tap()
+        XCTAssertTrue(element("liveMap.eta").waitForExistence(timeout: uiTimeout))
+        stopRecording()
+    }
+}
+
+final class LiveMapPlannedRouteMovingUITests: LiveMapPlannedRouteUITestCase {
+    override var extraLaunchArguments: [String] { ["-UITesting.plannedRouteSeed", "-UITesting.plannedRouteMoving"] }
+
+    func testSearchStaysOpenWhileMoving() throws {
+        try openLiveMap()
+        element("liveMap.destination").tap()
+
+        XCTAssertTrue(element("destinationSheet.search").waitForExistence(timeout: uiTimeout))
+        XCTAssertFalse(element("destinationSheet.search.locked").exists)
+        let place = element(seedPlaceIdentifier)
+        XCTAssertTrue(place.waitForExistence(timeout: uiTimeout))
+        place.tap()
+        XCTAssertTrue(element("liveMap.eta").waitForExistence(timeout: uiTimeout))
+
+        stopRecording()
+    }
+}
+
+final class LiveMapPlannedRoutePadUITests: LiveMapPlannedRouteUITestCase {
+    /// The runner can report a phone idiom on an iPad simulator; the app window cannot lie.
+    private var isPad: Bool {
+        let frame = app.windows.firstMatch.frame
+        return min(frame.width, frame.height) >= 744
+    }
+
+    func testPadDestinationFormPicksAndCloses() throws {
+        XCTAssertTrue(tripsTab.waitForExistence(timeout: uiTimeout))
+        try XCTSkipUnless(isPad, "iPad layout")
+        XCUIDevice.shared.orientation = .landscapeLeft
+        try openLiveMap()
+        element("liveMap.destination").tap()
+
+        let close = element("destinationSheet.close")
+        XCTAssertTrue(close.waitForExistence(timeout: uiTimeout))
+        close.tap()
+        XCTAssertTrue(close.waitForNonExistence(timeout: uiTimeout))
+
+        element("liveMap.destination").tap()
+        let place = element(seedPlaceIdentifier)
+        XCTAssertTrue(place.waitForExistence(timeout: uiTimeout))
+        place.tap()
+        XCTAssertTrue(element("liveMap.eta").waitForExistence(timeout: uiTimeout))
+
+        stopRecording()
+    }
+}
+
+final class JournalCornerCardUITests: TrailhoundUITestCase {
+    override var extraLaunchArguments: [String] { ["-UITesting.journalCoverSeed", "-UITesting.closedCover"] }
+
+    private let journalRow = "journal.row.AAAAAAAA-0000-4000-8000-0000000000C1"
+
+    override func tearDownWithError() throws {
+        XCUIDevice.shared.orientation = .portrait
+        try super.tearDownWithError()
+    }
+
+    func testCornerCardShowsAMemberThenCollapses() throws {
+        XCTAssertTrue(tripsTab.waitForExistence(timeout: uiTimeout))
+        let segment = app.segmentedControls["trips.segment"]
+        XCTAssertTrue(segment.waitForExistence(timeout: uiTimeout))
+        segment.buttons["Travels"].tap()
+
+        let row = app.descendants(matching: .any)[journalRow]
+        XCTAssertTrue(row.waitForExistence(timeout: uiTimeout))
+        row.tap()
+
+        XCUIDevice.shared.orientation = .landscapeLeft
+        let card = app.descendants(matching: .any)["journal.cornerCard"]
+        XCTAssertTrue(card.waitForExistence(timeout: uiTimeout))
+
+        let expand = app.descendants(matching: .any)["journal.cornerCard.expand"]
+        XCTAssertTrue(expand.waitForExistence(timeout: uiTimeout))
+        expand.tap()
+        let member = app.descendants(matching: .any)["journal.cornerCard.member"]
+        XCTAssertTrue(member.waitForExistence(timeout: uiTimeout))
+
+        let collapse = app.descendants(matching: .any)["journal.cornerCard.collapse"]
+        XCTAssertTrue(collapse.waitForExistence(timeout: uiTimeout))
+        collapse.tap()
+        XCTAssertTrue(member.waitForNonExistence(timeout: uiTimeout))
+    }
+}

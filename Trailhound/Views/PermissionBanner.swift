@@ -269,16 +269,16 @@ struct GPSQualityBadge: View {
   var body: some View {
     HStack(spacing: compact ? 3 : 4) {
       Image(systemName: icon)
-        .font(compact ? .system(size: 9, weight: .semibold) : .caption2)
+        .font(compact ? .system(size: 9, weight: .semibold) : .caption.weight(.semibold))
         .symbolEffect(.bounce, value: quality)
       Text(label)
-        .font(compact ? .system(size: 10, weight: .medium) : .caption2.weight(.medium))
+        .font(compact ? .system(size: 10, weight: .medium) : .caption.weight(.bold))
         .lineLimit(1)
         .minimumScaleFactor(compact ? 0.75 : 1)
     }
     .foregroundStyle(Color.white)
     .padding(.horizontal, compact ? 6 : 8)
-    .padding(.vertical, compact ? 3 : 4)
+    .padding(.vertical, compact ? 3 : 6)
     .background(color)
     .clipShape(Capsule())
     .compositingGroup()

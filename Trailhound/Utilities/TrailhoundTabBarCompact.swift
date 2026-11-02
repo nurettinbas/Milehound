@@ -48,6 +48,15 @@ enum TrailhoundTabBarTheme {
     ]
 }
 
+/// A screen that hid the tab bar with `.toolbar(.hidden, for: .tabBar)` sets this, so the
+/// installer below does not force the bar back on.
+@MainActor
+@Observable
+final class TrailhoundTabBarVisibility {
+    static let shared = TrailhoundTabBarVisibility()
+    var hiddenByScreen = false
+}
+
 /// System iOS 26 `UITabBar`. Light and Dark keep the system Liquid Glass platter.
 /// The selection capsule and its icon use the palette tint — iOS otherwise paints
 /// that capsule with `AccentColor` (blue) on every theme. Do not copy
@@ -58,8 +67,10 @@ enum TrailhoundTabBarCompact {
         @MainActor static var key: UInt8 = 0
     }
     static func apply(to tabBar: UITabBar, palette: ShellPalette, scheme: ColorScheme) {
-        tabBar.isHidden = false
-        tabBar.alpha = 1
+        if !TrailhoundTabBarVisibility.shared.hiddenByScreen {
+            tabBar.isHidden = false
+            tabBar.alpha = 1
+        }
         restoreSystemWidthIfNeeded(tabBar)
         clearInterfaceStylePin(tabBar)
         clearItemInterfaceStylePins(in: tabBar)
@@ -274,6 +285,21 @@ enum TrailhoundTabBarCompact {
         }
         return tabBar.convert(tabBar.bounds, to: window)
     }
+
+    /// Visible glass pill of a side tab, in window coordinates. `platterFrame` is the
+    /// icon union, which stops short of the pill's rounded ends.
+    static func sidePillFrame(of tabBar: UITabBar, in window: UIWindow) -> CGRect? {
+        guard tabBar.bounds.height > tabBar.bounds.width * 1.4 else { return nil }
+        let bar = tabBar.convert(tabBar.bounds, to: window)
+        if let cached = cachedVisiblePill, sameFrame(cached.bar, bar) {
+            return cached.pill
+        }
+        guard let pill = sideIconPill(in: window, bar: bar) else { return nil }
+        cachedVisiblePill = (bar, pill)
+        return pill
+    }
+
+    private static var cachedVisiblePill: (bar: CGRect, pill: CGRect)?
 
     /// Union of the tab icons. The column view itself runs up under the clock;
     /// the icons start lower, and that top is what the bell has to clear.
@@ -552,7 +578,9 @@ final class TrailhoundTabBarCompactController: UIViewController {
         let chrome = SideColumnChromeState.shared
         guard !chrome.isTransitioning else { return }
         guard let window = view.window ?? keyWindow() else { return }
-        let frame = primaryTabBar().map { TrailhoundTabBarCompact.platterFrame(of: $0, in: window) }
+        let tabBar = primaryTabBar()
+        let frame = tabBar.map { TrailhoundTabBarCompact.platterFrame(of: $0, in: window) }
+        let pill = tabBar.flatMap { TrailhoundTabBarCompact.sidePillFrame(of: $0, in: window) }
         let direction: LayoutDirection = window.effectiveUserInterfaceLayoutDirection == .rightToLeft
             ? .rightToLeft
             : .leftToRight
@@ -565,6 +593,7 @@ final class TrailhoundTabBarCompactController: UIViewController {
             windowSize: window.bounds.size,
             safeInsets: window.safeAreaInsets,
             tabBarFrame: frame,
+            sidePillFrame: pill,
             layoutDirection: direction,
             statusClusterMaxY: status
         )

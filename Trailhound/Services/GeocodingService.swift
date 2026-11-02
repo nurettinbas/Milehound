@@ -48,6 +48,16 @@ actor GeocodingService {
         around coordinate: CLLocationCoordinate2D,
         radius: CLLocationDistance = 450
     ) async -> [NearbyPlaceOption] {
+        if UITestSupport.seedsPlannedRoute {
+            return [
+                NearbyPlaceOption(
+                    id: "cafe",
+                    name: "Seed Cafe",
+                    subtitle: "Cafe",
+                    coordinate: UITestSupport.plannedRouteSeedOrigin
+                ),
+            ]
+        }
         let request = MKLocalPointsOfInterestRequest(center: coordinate, radius: radius)
         let search = MKLocalSearch(request: request)
 
