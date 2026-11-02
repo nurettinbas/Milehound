@@ -1275,8 +1275,8 @@ struct LiveFollowRouteCard: View {
     private var heightScale: CGFloat { 1.25 }
 
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 30)) { context in
-            let content = LiveFollowRouteChipHost.content(for: plannedRoute, now: context.date)
+        TimelineView(.periodic(from: .now, by: 30)) { _ in
+            let content = LiveFollowRouteChipHost.content(for: plannedRoute, now: plannedRoute.now())
             let missed = plannedRoute.missedTurn
             let rerouting = plannedRoute.isRerouting
             let maneuver = (missed || rerouting) ? nil : plannedRoute.upcomingManeuver
@@ -1587,9 +1587,9 @@ struct LiveFollowRouteChipHost: View {
     var action: () -> Void
 
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 30)) { context in
+        TimelineView(.periodic(from: .now, by: 30)) { _ in
             RecordingRouteChip(
-                content: Self.content(for: plannedRoute, now: context.date),
+                content: Self.content(for: plannedRoute, now: plannedRoute.now()),
                 action: action,
                 wide: true
             )

@@ -7,9 +7,21 @@ import XCTest
 
 @MainActor
 final class LiveFollowPlannedRouteSnapshotTests: XCTestCase {
+    private var savedTimeZone: TimeZone?
+
     override func setUp() {
         super.setUp()
         continueAfterFailure = true
+        // The route card prints a clock arrival time; CI runs in UTC.
+        savedTimeZone = NSTimeZone.default
+        NSTimeZone.default = TimeZone(identifier: "UTC")!
+    }
+
+    override func tearDown() {
+        if let savedTimeZone {
+            NSTimeZone.default = savedTimeZone
+        }
+        super.tearDown()
     }
 
     private struct LayoutCase {
