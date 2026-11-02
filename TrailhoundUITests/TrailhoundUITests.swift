@@ -311,16 +311,17 @@ final class TrailhoundUITests: TrailhoundUITestCase {
         XCTAssertTrue(settingsTab.waitForExistence(timeout: uiTimeout))
         settingsTab.tap()
 
+        let theme = app.switches["settings.themeSwitch"]
+        revealSettingsControl(theme)
+        XCTAssertTrue(theme.waitForExistence(timeout: uiTimeout), "Day/night switch should exist after scrolling Settings")
+        if String(describing: theme.value ?? "") == "1" {
+            theme.tap()
+        }
+
         let appearance = app.descendants(matching: .any)["settings.appearance"]
         revealSettingsControl(appearance)
-        XCTAssertTrue(appearance.waitForExistence(timeout: uiTimeout), "Appearance picker should exist after scrolling Settings")
-
-        let lightSegment = appearance.buttons["Light"]
-        if lightSegment.waitForExistence(timeout: 2) {
-            lightSegment.tap()
-        } else if appearance.buttons.count >= 2 {
-            appearance.buttons.element(boundBy: 1).tap()
-        }
+        XCTAssertTrue(appearance.waitForExistence(timeout: uiTimeout), "Appearance row should exist after scrolling Settings")
+        appearance.tap()
 
         let orangeSwatch = app.buttons["settings.shellPalette.orange"]
         revealSettingsControl(orangeSwatch)

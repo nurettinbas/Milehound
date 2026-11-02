@@ -95,6 +95,7 @@ enum RecapShareRenderer {
         .environment(\.colorScheme, scheme)
         .environment(\.achievementIdleTime, nil)
         .preferredColorScheme(scheme)
+        .trailhoundShareCaptureEnvironment()
 
         let renderer = ImageRenderer(content: card)
         renderer.proposedSize = ProposedViewSize(width: layout.width, height: layout.height)

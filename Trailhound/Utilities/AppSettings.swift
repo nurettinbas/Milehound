@@ -71,6 +71,10 @@ final class AppSettings {
     var appearanceMode: AppearanceMode = .default {
         didSet { defaults.set(appearanceMode.rawValue, forKey: Key.appearanceMode) }
     }
+    /// In-app text size, relative to the iPhone Dynamic Type setting. `standard` does not override it.
+    var textSize: AppTextSize = .standard {
+        didSet { defaults.set(textSize.rawValue, forKey: Key.textSize) }
+    }
     /// Curated shell background hue. Light and Dark resolve different shade families.
     var shellPalette: ShellPalette = .default {
         didSet {
@@ -100,6 +104,7 @@ final class AppSettings {
         static let recordingVehicleID = "recording.vehicleID"
         static let liveFollowMap3DEnabled = "recording.liveFollowMap3DEnabled"
         static let appearanceMode = "appearanceMode"
+        static let textSize = "appearance.textSize"
         static let widgetShowRoutePreview = "widget.showRoutePreview"
         static let shellPalette = ShellPalette.storageKey
         static let smartCategorySuggestionsEnabled = "smartCategorySuggestionsEnabled"
@@ -140,6 +145,10 @@ final class AppSettings {
         if let raw = resolvedDefaults.string(forKey: Key.appearanceMode),
            let mode = AppearanceMode(rawValue: raw) {
             appearanceMode = mode
+        }
+        if let raw = resolvedDefaults.string(forKey: Key.textSize),
+           let size = AppTextSize(rawValue: raw) {
+            textSize = size
         }
         if let raw = resolvedDefaults.string(forKey: Key.shellPalette),
            let palette = ShellPalette(rawValue: raw) {

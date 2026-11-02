@@ -195,7 +195,7 @@ enum AppIconSync {
     /// Key window plus every normal window. Unfolding the Duo resizes a window that
     /// is not key for a frame; painting only the key window left that canvas white.
     @MainActor
-    private static func isAppWindow(_ window: UIWindow) -> Bool {
+    static func isAppWindow(_ window: UIWindow) -> Bool {
         let name = String(describing: type(of: window))
         if name.contains("Keyboard") || name.contains("TextEffects") { return false }
         let key = window.isKeyWindow

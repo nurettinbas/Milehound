@@ -28,6 +28,7 @@ struct ContentView: View {
     @State private var tabsOrigin: CGPoint = .zero
 
     var body: some View {
+        AppLanguageRefresh {
         ZStack {
             Group {
             if !contentMounted {
@@ -49,6 +50,7 @@ struct ContentView: View {
             }
         }
         .preferredColorScheme(settings.appearanceMode.preferredColorScheme)
+        .appTextSizeScope()
         .onGlassShell()
         .glassMorphPanelHost()
         .recapCardExpandHost()
@@ -81,7 +83,9 @@ struct ContentView: View {
             .coordinateSpace(name: TrailhoundWindowSpace.name)
             .environment(\.trailhoundLayout, layoutSnapshot)
             .environment(\.shellPalette, settings.shellPalette)
+            .environment(\.locale, AppLanguageStore.shared.locale)
             .preferredColorScheme(settings.appearanceMode.preferredColorScheme)
+            .appTextSizeScope()
             .onGlassShell()
             .toastHost()
             .deleteConfirmHost()
@@ -130,6 +134,7 @@ struct ContentView: View {
             guard !rotating else { return }
             rememberPresentedLayout()
             syncWindowFill()
+        }
         }
     }
 
@@ -515,11 +520,21 @@ private struct TrailhoundRootTint: ViewModifier {
     @Environment(\.shellPalette) private var shellPalette
 
     func body(content: Content) -> some View {
+        content.tint(chromeTint)
+    }
+
+    /// White Light tint plates the iOS 26 toolbar, so that case uses the tab selection color.
+    /// The modifier stays in place so a theme change does not rebuild the tabs.
+    private var chromeTint: Color {
         if colorScheme == .light, GlassEngineResolver.lightAvoidsWhiteChromeTint {
-            content
-        } else {
-            content.tint(shellPalette.shellTint(for: colorScheme))
+            return Color(
+                uiColor: TrailhoundTabBarTheme.selectionTintUIColor(
+                    palette: shellPalette,
+                    scheme: colorScheme
+                )
+            )
         }
+        return shellPalette.shellTint(for: colorScheme)
     }
 }
 
@@ -548,11 +563,21 @@ private struct TrailhoundTabContentChrome: ViewModifier {
     @Environment(\.shellPalette) private var shellPalette
 
     func body(content: Content) -> some View {
+        content.tint(chromeTint)
+    }
+
+    /// iOS 26 Light used to skip this modifier. Skipping rebuilt the page and popped
+    /// Settings. The selection tint matches what the tab bar already provides, without the white plate.
+    private var chromeTint: Color {
         if colorScheme == .light, GlassEngineResolver.lightAvoidsWhiteChromeTint {
-            content
-        } else {
-            content.tint(shellPalette.shellTint(for: colorScheme))
+            return Color(
+                uiColor: TrailhoundTabBarTheme.selectionTintUIColor(
+                    palette: shellPalette,
+                    scheme: colorScheme
+                )
+            )
         }
+        return shellPalette.shellTint(for: colorScheme)
     }
 }
 

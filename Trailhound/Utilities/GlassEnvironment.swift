@@ -27,22 +27,22 @@ private struct OnGlassShellModifier: ViewModifier {
     @Environment(\.shellPalette) private var shellPalette
 
     func body(content: Content) -> some View {
-        if colorScheme == .dark {
-            content
-        } else if GlassEngineResolver.lightAvoidsWhiteChromeTint {
-            content.foregroundStyle(shellPalette.shellForeground(for: .light))
-        } else {
-            content
-                .foregroundStyle(shellPalette.shellForeground(for: .light))
-                .tint(shellPalette.shellTint(for: .light))
-        }
+        // One chain in Light and Dark. An if/else here rebuilds the tab stack on a theme
+        // change and pops Settings back to the top.
+        let tint = colorScheme == .light && !GlassEngineResolver.lightAvoidsWhiteChromeTint
+            ? shellPalette.shellTint(for: .light)
+            : nil
+        content
+            .foregroundStyle(shellPalette.shellForeground(for: colorScheme))
+            .tint(tint)
     }
 }
 
 extension View {
     /// Light glass shell: white type on the atmosphere. iOS 26 does not apply
     /// white `.tint` — that fills toolbar/tab liquid with a second white plate.
-    /// Dark is a no-op so the existing recipe is unchanged.
+    /// Dark uses the primary label color. The modifier chain does not branch,
+    /// so a theme change keeps the open Settings page.
     func onGlassShell() -> some View {
         modifier(OnGlassShellModifier())
     }

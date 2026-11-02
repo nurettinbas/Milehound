@@ -291,15 +291,26 @@ enum L10n {
     static var settingsPairVehicleHint: String { string("settings.vehicle_pairing.hint") }
     static var settingsDefineVehicle: String { string("settings.vehicle_pairing.define") }
     static var settingsAppearanceSection: String { string("settings.appearance.section") }
-    static var settingsAppearancePicker: String { string("settings.appearance.picker") }
-    static var settingsAppearanceSystem: String { string("settings.appearance.system") }
-    static var settingsAppearanceLight: String { string("settings.appearance.light") }
-    static var settingsAppearanceDark: String { string("settings.appearance.dark") }
     static var settingsAppearanceHint: String { string("settings.appearance.hint") }
+    static var settingsAppearanceSubtitle: String { string("settings.appearance.subtitle") }
+    static var settingsAppearancePreviewTitle: String { string("settings.appearance.preview.title") }
+    static var settingsAppearancePreviewDetail: String { string("settings.appearance.preview.detail") }
     static var settingsShellPaletteHint: String { string("settings.shell_palette.hint") }
+    static var settingsPersonalizationSection: String { string("settings.personalization.section") }
+    static var settingsThemeLightTitle: String { string("settings.theme.light.title") }
+    static var settingsThemeDarkTitle: String { string("settings.theme.dark.title") }
+    static var settingsThemeLightHint: String { string("settings.theme.light.hint") }
+    static var settingsThemeDarkHint: String { string("settings.theme.dark.hint") }
+    static var settingsThemeMatchSystem: String { string("settings.theme.match_system") }
+    static var settingsTextSizeTitle: String { string("settings.text_size.title") }
+    static var settingsLanguageSystem: String { string("settings.language.system") }
+
+    static func settingsLanguageSystemSubtitle(_ name: String) -> String {
+        String(format: string("settings.language.subtitle"), name)
+    }
 
     static func shellPaletteName(_ palette: ShellPalette) -> String {
-        SharedL10n.text("settings.shell_palette.\(palette.rawValue)", bundle: .main)
+        string("settings.shell_palette.\(palette.rawValue)")
     }
     static var settingsSmartCategorySection: String { string("settings.smart_category.section") }
     static var settingsSmartCategoryToggle: String { string("settings.smart_category.toggle") }
@@ -307,7 +318,6 @@ enum L10n {
     static var settingsSmartCategoryWorkStart: String { string("settings.smart_category.work_start") }
     static var settingsSmartCategoryWorkEnd: String { string("settings.smart_category.work_end") }
     static var settingsLanguageSection: String { string("settings.language.section") }
-    static var settingsLanguageSystemHint: String { string("settings.language.system_hint") }
     static var settingsFuelSection: String { string("settings.fuel.section") }
     static var settingsFuelConsumption: String { string("settings.fuel.consumption") }
     static var settingsFuelPrice: String { string("settings.fuel.price") }

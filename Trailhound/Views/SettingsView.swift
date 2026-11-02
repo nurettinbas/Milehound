@@ -290,37 +290,36 @@ struct SettingsView: View {
             }
 
             Section {
+                ThemeModeHeroRow()
+                    .glassRow(position: .first)
                 settingsSectionAnchor(.appearance)
-                Picker(L10n.settingsAppearancePicker, selection: $settings.appearanceMode) {
-                    Text(L10n.settingsAppearanceSystem).tag(AppearanceMode.system)
-                    Text(L10n.settingsAppearanceLight).tag(AppearanceMode.light)
-                    Text(L10n.settingsAppearanceDark).tag(AppearanceMode.dark)
+                NavigationLink {
+                    AppearanceSettingsView()
+                } label: {
+                    GlassFeaturedRowLabel(
+                        systemImage: "paintpalette.fill",
+                        title: L10n.settingsAppearanceSection,
+                        subtitle: appearanceSummary
+                    )
                 }
-                .glassSegmentedStyle()
-                .labelsHidden()
+                .glassHidesNavigationLinkIndicator()
                 .accessibilityIdentifier("settings.appearance")
-                .glassRow(position: .first)
-                ShellPalettePicker(selection: $settings.shellPalette)
-                    .glassRow(position: .last)
-            } header: {
-                Text(L10n.settingsAppearanceSection)
-            } footer: {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(L10n.settingsAppearanceHint)
-                    Text(L10n.settingsShellPaletteHint)
-                }
-            }
-
-            Section {
+                .glassRow(position: .middle)
                 settingsSectionAnchor(.language)
-                Button(L10n.settingsOpenSystemSettings) {
-                    SystemSettingsLink.openAppPage()
+                NavigationLink {
+                    LanguageSettingsView()
+                } label: {
+                    GlassFeaturedRowLabel(
+                        systemImage: "globe",
+                        title: L10n.settingsLanguageSection,
+                        subtitle: languageSummary
+                    )
                 }
-                .glassRow(position: .only)
+                .glassHidesNavigationLinkIndicator()
+                .accessibilityIdentifier("settings.language")
+                .glassRow(position: .last)
             } header: {
-                Text(L10n.settingsLanguageSection)
-            } footer: {
-                Text(L10n.settingsLanguageSystemHint)
+                Text(L10n.settingsPersonalizationSection)
             }
 
             Section(L10n.settingsFuelSection) {
@@ -626,6 +625,23 @@ struct SettingsView: View {
         .animation(.easeInOut(duration: 0.2), value: isExporting)
     }
 
+    private var appearanceSummary: String {
+        "\(L10n.shellPaletteName(settings.shellPalette)) · \(L10n.string(settings.textSize.titleKey))"
+    }
+
+    private var languageSummary: String {
+        let language = AppLanguageStore.shared.language
+        switch language {
+        case .system:
+            let name = SharedLanguage.preferredSystemCode() == "tr"
+                ? AppLanguage.tr.nativeName
+                : AppLanguage.en.nativeName
+            return L10n.settingsLanguageSystemSubtitle(name)
+        case .en, .tr:
+            return language.nativeName
+        }
+    }
+
     private var favoritePlacesRowCount: Int {
         (places.isEmpty ? 1 : 0) + places.count + 1
     }
@@ -791,50 +807,6 @@ struct SettingsView: View {
                 }
             }
         )
-    }
-}
-
-private struct ShellPalettePicker: View {
-    @Binding var selection: ShellPalette
-    @Environment(\.colorScheme) private var colorScheme
-
-    private let columns = Array(repeating: GridItem(.flexible(), spacing: 10), count: 5)
-
-    var body: some View {
-        LazyVGrid(columns: columns, spacing: 12) {
-            ForEach(ShellPalette.allCases) { palette in
-                Button {
-                    selection = palette
-                } label: {
-                    ZStack {
-                        Circle()
-                            .fill(
-                                LinearGradient(
-                                    colors: palette.gradientColors(for: colorScheme),
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                )
-                            )
-                        if selection == palette {
-                            Circle()
-                                .strokeBorder(Color.white, lineWidth: 2.5)
-                            Image(systemName: "checkmark")
-                                .font(.caption.weight(.bold))
-                                .foregroundStyle(Color.white)
-                        }
-                    }
-                    .frame(width: 36, height: 36)
-                    .shadow(color: Color.black.opacity(0.18), radius: 2, y: 1)
-                }
-                .buttonStyle(.glassPlainHit)
-                .accessibilityLabel(L10n.shellPaletteName(palette))
-                .accessibilityAddTraits(selection == palette ? .isSelected : [])
-                .accessibilityIdentifier("settings.shellPalette.\(palette.rawValue)")
-            }
-        }
-        .padding(.vertical, 8)
-        .accessibilityIdentifier("settings.shellPalette")
-        .accessibilityElement(children: .contain)
     }
 }
 

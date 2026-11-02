@@ -125,6 +125,8 @@ enum UITestSupport {
         settings.smartCategorySuggestionsEnabled = true
         settings.appearanceMode = .system
         settings.shellPalette = .default
+        settings.textSize = .standard
+        AppLanguageStore.shared.select(.en)
         if showsDrivingSafetyNotice {
             DrivingSafetyNoticePolicy().reset()
         } else {
