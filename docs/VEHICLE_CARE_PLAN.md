@@ -22,7 +22,7 @@ A purchase can be **pay in full** or **2–24 monthly installments**.
 
 | Rule | Behavior |
 |------|----------|
-| Amount | Total of the purchase. Trailhound splits it into equal monthly shares (leftover kuruş on the last slice). |
+| Amount | Total of the purchase. Milehound splits it into equal monthly shares (leftover kuruş on the last slice). |
 | Date | First payment. Later slices are the same calendar day in following months (31 Jan → 28/29 Feb). |
 | Ledger | Each slice is a real `VehicleExpense` on its due date, sharing `installmentGroupID`. |
 | Expenses list | Due/past slices only. Future slices sit under **Upcoming installments** until that day. |

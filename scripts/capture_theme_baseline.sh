@@ -1,6 +1,6 @@
 #!/bin/bash
 # Captures light/dark before screenshots for the liquid-glass theme work.
-# Requires a booted iPhone simulator with Trailhound installed.
+# Requires a booted iPhone simulator with Milehound installed.
 # Usage: scripts/capture_theme_baseline.sh [light|dark|both]
 # Output: /tmp/th-before/{light,dark}/<screen>.png
 
@@ -8,13 +8,13 @@ set -euo pipefail
 
 MODE="${1:-both}"
 DEST="/tmp/th-before"
-BUNDLE="com.trailhound.app"
+BUNDLE="com.milehound.app"
 
 mkdir -p "$DEST/light" "$DEST/dark"
 
 udid="$(xcrun simctl list devices booted | awk -F '[()]' '/iPhone/{print $2; exit}')"
 if [[ -z "${udid:-}" ]]; then
-  echo "No booted iPhone simulator. Boot one, install Trailhound, then re-run."
+  echo "No booted iPhone simulator. Boot one, install Milehound, then re-run."
   exit 1
 fi
 

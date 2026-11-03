@@ -44,7 +44,7 @@ os_version_is_newer() {
 pick_from_xcodebuild() {
   local destinations_file line pick_line id name os
   destinations_file="$(mktemp)"
-  xcodebuild -showdestinations -project Trailhound.xcodeproj -scheme Trailhound 2>/dev/null \
+  xcodebuild -showdestinations -project Milehound.xcodeproj -scheme Milehound 2>/dev/null \
     | grep -E "platform: ?iOS Simulator" \
     | grep -vi placeholder \
     | grep -E "name: ?iPhone" > "$destinations_file" || true

@@ -8,10 +8,10 @@ import uuid
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-PBX = ROOT / "Trailhound.xcodeproj" / "project.pbxproj"
+PBX = ROOT / "Milehound.xcodeproj" / "project.pbxproj"
 
-UNIT_FILES = sorted((ROOT / "TrailhoundTests").rglob("*.swift"))
-UI_FILES = sorted((ROOT / "TrailhoundUITests").rglob("*.swift")) if (ROOT / "TrailhoundUITests").exists() else []
+UNIT_FILES = sorted((ROOT / "MilehoundTests").rglob("*.swift"))
+UI_FILES = sorted((ROOT / "MilehoundUITests").rglob("*.swift")) if (ROOT / "MilehoundUITests").exists() else []
 
 UNIT_SOURCES_PHASE = "0CB5EC5CDD2143B581DB8157"
 UNIT_GROUP = "EAD0FC18DADB4E359AC65213"
@@ -19,7 +19,7 @@ UI_SOURCES_PHASE = "UITESTSRC00000000000001"
 UI_GROUP = "UITESTGRP00000000000001"
 
 STALE_TEST_FILENAMES = [
-    "TrailhoundTests.swift",
+    "MilehoundTests.swift",
     "PairingAndCoordinatorTests.swift",
     "VehicleConnectRecordingTests.swift",
 ]
@@ -155,11 +155,11 @@ def main() -> None:
         count=1,
     )
 
-    text = replace_group_children(text, UNIT_GROUP, "TrailhoundTests", unit_group)
+    text = replace_group_children(text, UNIT_GROUP, "MilehoundTests", unit_group)
     text = replace_sources_phase(text, UNIT_SOURCES_PHASE, unit_sources)
 
     if UI_FILES:
-        text = replace_group_children(text, UI_GROUP, "TrailhoundUITests", ui_group)
+        text = replace_group_children(text, UI_GROUP, "MilehoundUITests", ui_group)
         text = replace_sources_phase(text, UI_SOURCES_PHASE, ui_sources)
 
     PBX.write_text(text)

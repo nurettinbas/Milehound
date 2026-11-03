@@ -14,7 +14,7 @@ Use this address for app issues, general feedback, and feature requests.
 
 The log does not include GPS coordinates, addresses, place/vehicle names, photos, or your notes. On-device logs are kept for at most 30 days.
 
-If Mail is not configured, Trailhound copies `nurettin.bas@icloud.com` to the clipboard and offers the system share sheet so you can send `trailhound-debug.txt` from Gmail or another app.
+If Mail is not configured, Milehound copies `nurettin.bas@icloud.com` to the clipboard and offers the system share sheet so you can send `milehound-debug.txt` from Gmail or another app.
 
 ## Tips and refunds
 
@@ -24,8 +24,8 @@ If Mail is not configured, Trailhound copies `nurettin.bas@icloud.com` to the cl
 
 Use this page’s GitHub URL on the live `main` branch:
 
-`https://github.com/nurettinbas/Trailhound/blob/main/docs/SUPPORT.md`
+`https://github.com/nurettinbas/Milehound/blob/main/docs/SUPPORT.md`
 
 Privacy policy (required in-app and in App Store Connect):
 
-`https://github.com/nurettinbas/Trailhound/blob/main/docs/PRIVACY.md`
+`https://github.com/nurettinbas/Milehound/blob/main/docs/PRIVACY.md`

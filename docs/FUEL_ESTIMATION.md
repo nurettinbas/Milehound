@@ -1,6 +1,6 @@
 # Fuel estimation
 
-Trailhound shows two fuel figures. Neither is a pump reading.
+Milehound shows two fuel figures. Neither is a pump reading.
 
 | Label | Stored field | What it is |
 |---|---|---|
@@ -23,7 +23,7 @@ A map **Stop** pin is **not** engine-off. Auto-detected parking sits on the same
 
 ## Additive litres (model v6)
 
-Canonical copy lives on `TripFuelEstimate` in `Trailhound/Utilities/TripFuelEstimate.swift`. Keep that comment, this file, and the README formula in step.
+Canonical copy lives on `TripFuelEstimate` in `Milehound/Utilities/TripFuelEstimate.swift`. Keep that comment, this file, and the README formula in step.
 
 ```text
 Avg            = km × C₀ / 100
@@ -77,7 +77,7 @@ Warm mixed city + suburban should sit near **0.95–1.10×C₀** (your average o
 Written (never touches `estimatedFuelCost` or GPS points):
 
 - trip end, edit save, merge, cleanup, orphan finalize → `TripDerivedMetrics.recomputeFuel` (looks up the previous trip on the same vehicle)
-- launch backfill → `TripDerivedBackfillService` (`trailhound.derived.dynamicFuelVersion`, currently **6**), in vehicle + `startedAt` order
+- launch backfill → `TripDerivedBackfillService` (`milehound.derived.dynamicFuelVersion`, currently **6**), in vehicle + `startedAt` order
 - opening a completed trip also rewrites that trip’s stored Est. so the detail screen is not waiting on launch backfill
 - changing a trip’s time / distance / vehicle, or deleting / merging it, recomputes the **next** completed trip on that car (`TripFuelDependencyService`) so soak stays correct
 
@@ -104,4 +104,4 @@ The trip-edit L/100 field is unchanged on screen. Changing it and saving marks *
 
 ## Schema / user data
 
-Schema **V22** adds optional Trip measurement + estimate fields, rollup volume / `fuelUnitKey`, and `VehicleFuelCalibration`. Existing trips, GPS traces, and Avg fuel stay. Opening an existing store is a lightweight add of optional columns and a new table — the production path does **not** reset `Trailhound.store`.
+Schema **V22** adds optional Trip measurement + estimate fields, rollup volume / `fuelUnitKey`, and `VehicleFuelCalibration`. Existing trips, GPS traces, and Avg fuel stay. Opening an existing store is a lightweight add of optional columns and a new table — the production path does **not** reset `Milehound.store`.

@@ -1,6 +1,6 @@
 # Privacy policy
 
-Trailhound is a privacy-first trip recorder. Trip routes, vehicles, places, and expenses stay on your iPhone in a local SwiftData store. There is no account, no cloud backend, and no analytics or advertising SDK.
+Milehound is a privacy-first trip recorder. Trip routes, vehicles, places, and expenses stay on your iPhone in a local SwiftData store. There is no account, no cloud backend, and no analytics or advertising SDK.
 
 **Controller / contact:** Nurettin Baş — [nurettin.bas@icloud.com](mailto:nurettin.bas@icloud.com)
 
@@ -12,19 +12,19 @@ This page is the public privacy policy for the App Store listing and the in-app 
 - Receipt photos you attach to an expense, and any amount read from them
 - A rolling diagnostic log used only if you later choose **Report a problem**
 
-**Read Amount** on a receipt uses Apple’s on-device text recognition (Vision). The photo and the recognized text are processed on your iPhone. They are not sent to Trailhound, to an AI service, or to any server. The app shows what it read and fills the amount only after you confirm it.
+**Read Amount** on a receipt uses Apple’s on-device text recognition (Vision). The photo and the recognized text are processed on your iPhone. They are not sent to Milehound, to an AI service, or to any server. The app shows what it read and fills the amount only after you confirm it.
 
-Location is used for recording drives (app functionality). It is not sent to Trailhound unless you explicitly mail a diagnostic report, and that report does **not** include coordinates, addresses, place names, vehicle names, photos, or your notes.
+Location is used for recording drives (app functionality). It is not sent to Milehound unless you explicitly mail a diagnostic report, and that report does **not** include coordinates, addresses, place names, vehicle names, photos, or your notes.
 
 ## Maps and directions (Apple MapKit)
 
-Map tiles, place search, street names for trip ends, and the **planned route** on the live map come from Apple’s MapKit. When you pick a destination on the live map, the app sends your current position and that destination to Apple to get driving directions; when you type a place search, the text and the map area go to Apple. Apple’s reply includes the next turn and how far it is. That phrase is shown on the map and is not saved. These requests go straight from your iPhone to Apple under [Apple’s privacy policy](https://www.apple.com/legal/privacy/). Trailhound has no server in between, receives none of it, and does not save the destination or the planned route — they are held in memory only while that recording runs and are cleared when it ends.
+Map tiles, place search, street names for trip ends, and the **planned route** on the live map come from Apple’s MapKit. When you pick a destination on the live map, the app sends your current position and that destination to Apple to get driving directions; when you type a place search, the text and the map area go to Apple. Apple’s reply includes the next turn and how far it is. That phrase is shown on the map and is not saved. These requests go straight from your iPhone to Apple under [Apple’s privacy policy](https://www.apple.com/legal/privacy/). Milehound has no server in between, receives none of it, and does not save the destination or the planned route — they are held in memory only while that recording runs and are cleared when it ends.
 
 ## Report a problem (optional)
 
-Settings → **Report a problem** is infrequent and optional. Each time, Trailhound shows what the attachment contains and waits for you to continue. Nothing leaves the device until you send the system Mail message (or share the file yourself).
+Settings → **Report a problem** is infrequent and optional. Each time, Milehound shows what the attachment contains and waits for you to continue. Nothing leaves the device until you send the system Mail message (or share the file yourself).
 
-The attachment (`trailhound-debug.txt`) may include:
+The attachment (`milehound-debug.txt`) may include:
 
 - timestamps
 - recording start/stop/pause, Bluetooth / Live Activity / widget events
@@ -34,7 +34,7 @@ It does not include map coordinates, street addresses, place or vehicle names, p
 
 On the device, diagnostic segments are kept at most **30 days** and capped at **2 MB**. You can delete them from the same Report a problem sheet.
 
-If you send a report, the message goes through Apple Mail or the share destination you pick (for example Gmail). Apple / iCloud or that provider then processes the email under their terms. Trailhound does not operate a server that receives the file automatically.
+If you send a report, the message goes through Apple Mail or the share destination you pick (for example Gmail). Apple / iCloud or that provider then processes the email under their terms. Milehound does not operate a server that receives the file automatically.
 
 ## How mailed reports are used
 
@@ -44,11 +44,11 @@ Mailed diagnostics are used only to debug the issue you described (app functiona
 
 ## Support payments
 
-Settings → About → Support the developer offers optional tips through Apple In-App Purchase. Apple processes the payment under its own privacy policy. Trailhound does not receive your card number, Apple Account, or identity, and a tip unlocks nothing and is not stored in the app.
+Settings → About → Support the developer offers optional tips through Apple In-App Purchase. Apple processes the payment under its own privacy policy. Milehound does not receive your card number, Apple Account, or identity, and a tip unlocks nothing and is not stored in the app.
 
 ## Legal basis
 
-- **Trip recording on your iPhone:** Trailhound does not receive this data. Location is processed on your device only, under the iOS permission you grant and can withdraw in iOS Settings.
+- **Trip recording on your iPhone:** Milehound does not receive this data. Location is processed on your device only, under the iOS permission you grant and can withdraw in iOS Settings.
 - **Mailed diagnostic report:** your consent, given separately each time you choose to send it (GDPR Art. 6(1)(a); KVKK Art. 5(1) explicit consent). You can withdraw it by asking for deletion at any time; this does not affect earlier processing.
 - **Support email you write:** handling your request (GDPR Art. 6(1)(b); KVKK Art. 5(2)(c)).
 
@@ -68,7 +68,7 @@ If you are not satisfied with the answer, you can complain to the Personal Data 
 
 ## Children
 
-Trailhound is a driving log and is not directed at children. It does not knowingly collect data from anyone, including children.
+Milehound is a driving log and is not directed at children. It does not knowingly collect data from anyone, including children.
 
 ## Your choices
 

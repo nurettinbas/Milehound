@@ -30,9 +30,9 @@ TEST_ARGS=()
 if [[ "$XCODEBUILD_ACTION" == "build-for-testing" ]]; then
   :
 elif [[ "$ONLY_UI_TESTS" == "1" ]]; then
-  TEST_ARGS+=(-only-testing:TrailhoundUITests)
+  TEST_ARGS+=(-only-testing:MilehoundUITests)
 elif [[ "$INCLUDE_UI_TESTS" == "0" ]]; then
-  TEST_ARGS+=(-only-testing:TrailhoundTests)
+  TEST_ARGS+=(-only-testing:MilehoundTests)
 fi
 
 XCODEBUILD_SETTINGS=()
@@ -105,8 +105,8 @@ fi
 # Bash 3.2 + `set -u` treats empty "${arr[@]}" as unbound; build one argv list instead.
 XCODEBUILD_ARGV=(
   "$XCODEBUILD_ACTION"
-  -project Trailhound.xcodeproj
-  -scheme Trailhound
+  -project Milehound.xcodeproj
+  -scheme Milehound
   -destination "$DESTINATION"
   -resultBundlePath "$RESULT_BUNDLE"
 )

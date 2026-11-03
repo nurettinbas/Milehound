@@ -33,7 +33,7 @@ Out of v1: photos, journal share-poster, CKShare, live travel, clustering of GPS
 
 ## Placement (no new tab)
 
-[`AppTab`](../Trailhound/Utilities/TabSelection.swift) stays `trips | pairing | stats | year | settings`. Journals live inside the Trips tab.
+[`AppTab`](../Milehound/Utilities/TabSelection.swift) stays `trips | pairing | stats | year | settings`. Journals live inside the Trips tab.
 
 ```
 TripListView
@@ -51,7 +51,7 @@ Stats: a **Travel** chip next to the favorite-place filter (same independent-per
 
 ## Data (schema V19, additive)
 
-Journals shipped as **V19** (additive). Live tip schema is **V20** ([`ModelContainerFactory.currentSchemaVersion`](../Trailhound/Utilities/ModelContainerFactory.swift)), which also adds smart-category fields. Journals add a model and optional fields only — no store reset, no property rename.
+Journals shipped as **V19** (additive). Live tip schema is **V20** ([`ModelContainerFactory.currentSchemaVersion`](../Milehound/Utilities/ModelContainerFactory.swift)), which also adds smart-category fields. Journals add a model and optional fields only — no store reset, no property rename.
 
 ### `TravelJournal` (new)
 
@@ -88,7 +88,7 @@ List rows **must** read denormalized totals. Do not fault `trips` or `points` wh
 
 Existing V18 trips open with `journalID == nil`. Backfill is not required.
 
-Register `TravelJournal.self` in `ModelContainerFactory.liveSchema` and `TrailhoundSchemaV19`.
+Register `TravelJournal.self` in `ModelContainerFactory.liveSchema` and `MilehoundSchemaV19`.
 
 ---
 
@@ -138,11 +138,11 @@ Same skeleton as trip detail: full-screen MapKit + bottom glass panel. Do not re
 **Map**
 
 - One polyline per member trip.
-- Palette: brand-blue steps from `TrailhoundBrandColors` / `StatsChartTheme.distanceSliceColors` (stable by `trip.id`). No rainbow, no recording red.
+- Palette: brand-blue steps from `MilehoundBrandColors` / `StatsChartTheme.distanceSliceColors` (stable by `trip.id`). No rainbow, no recording red.
 - **Selected** trip: full speed-colored segments (`SpeedColoredSegmentBuilder.maxColorSegments` = 60) + white casing (same settled look as trip detail).
 - **Others:** single brand stroke at **40%** opacity.
 - Tap polyline or day-row to select. Selection does not push `TripDetailView` by itself.
-- Fit: union bbox of all display pieces + `MapFitContext.detailOverlay`. Toolbar expand/collapse reuses `TrailhoundMotion.mapExpand` / `mapCollapse` and frozen glass during the transition.
+- Fit: union bbox of all display pieces + `MapFitContext.detailOverlay`. Toolbar expand/collapse reuses `MilehoundMotion.mapExpand` / `mapCollapse` and frozen glass during the transition.
 - Reduce Motion: instant fit, no draw-on, no mosaic crossfade.
 
 **Panel**
@@ -202,9 +202,9 @@ Privacy clip: each route uses the same privacy-radius clipping as trip detail / 
 ## Theme / motion / a11y
 
 - Shell: `AtmosphericBackground` + `GlassSurface` / `glassRow` / `glassChip`.
-- Accent: `TrailhoundBrandColors` blues. Recording red/orange only on the live recording card, never on journal chrome.
+- Accent: `MilehoundBrandColors` blues. Recording red/orange only on the live recording card, never on journal chrome.
 - Typography: system styles (`.headline` title, `.caption` meta). No custom fonts.
-- Motion: `TrailhoundMotion.gentle` for list insert; `sheetRise` for create sheet; `mapExpand` / `mapCollapse` on detail. Reduce Motion: `nil` animations, instant map fit, static mosaic.
+- Motion: `MilehoundMotion.gentle` for list insert; `sheetRise` for create sheet; `mapExpand` / `mapCollapse` on detail. Reduce Motion: `nil` animations, instant map fit, static mosaic.
 - VoiceOver: card label is title, dates, trip count, distance, cost. Mosaic images are decorative (`accessibilityHidden`).
 - Appearance: follow `AppSettings.appearanceMode`; map style picker on expanded journal map matches trip detail (light/dark override).
 
@@ -248,7 +248,7 @@ Share v1: keep per-trip share cards. A multi-snapshot travel poster is explicitl
 
 | Area | Likely files |
 |------|----------------|
-| Model | `Trailhound/Models/TravelJournal.swift`; `Trip.journalID` / `journal`; schema V19 |
+| Model | `Milehound/Models/TravelJournal.swift`; `Trip.journalID` / `journal`; schema V19 |
 | Totals | `TravelJournalTotals` next to `TripDerivedMetrics` |
 | Suggest | `Utilities/TravelJournalSuggester.swift` (pure) |
 | Map budget | `Utilities/TravelJournalMapBudget.swift` (pure) |

@@ -4,8 +4,8 @@
 
 - Apple Developer Program membership
 - App icon (1024×1024)
-- Privacy policy URL: `https://github.com/nurettinbas/Trailhound/blob/main/docs/PRIVACY.md`
-- Support URL: `https://github.com/nurettinbas/Trailhound/blob/main/docs/SUPPORT.md`
+- Privacy policy URL: `https://github.com/nurettinbas/Milehound/blob/main/docs/PRIVACY.md`
+- Support URL: `https://github.com/nurettinbas/Milehound/blob/main/docs/SUPPORT.md`
 
 ## Automated tests (CI / local)
 
@@ -15,8 +15,8 @@
 
 ## Xcode setup
 
-1. Bundle ID: `com.trailhound.app`
-2. Widget: `com.trailhound.app.widget`
+1. Bundle ID: `com.milehound.app`
+2. Widget: `com.milehound.app.widget`
 3. Signing: Automatic + select Team
 4. Capabilities: App Groups, Background Modes (location)
 
@@ -26,10 +26,10 @@
 2. Include privacy manifest: `PrivacyInfo.xcprivacy`
 3. Location usage description: trip recording
 4. Screenshots: list, detail map, stats, recap, settings
-5. Privacy Policy URL: `https://github.com/nurettinbas/Trailhound/blob/main/docs/PRIVACY.md` (the app opens `PRIVACY_TR.md`, the KVKK notice, when its language is Turkish)
-6. Support URL: `https://github.com/nurettinbas/Trailhound/blob/main/docs/SUPPORT.md`
+5. Privacy Policy URL: `https://github.com/nurettinbas/Milehound/blob/main/docs/PRIVACY.md` (the app opens `PRIVACY_TR.md`, the KVKK notice, when its language is Turkish)
+6. Support URL: `https://github.com/nurettinbas/Milehound/blob/main/docs/SUPPORT.md`
 7. App Privacy (nutrition label), aligned with `PrivacyInfo.xcprivacy` and `docs/PRIVACY.md`: **Data Not Collected**. Location, photos, and receipts stay on the device. A diagnostic report leaves only when the user sends Mail or the share sheet themselves, which is not app collection. Do not also declare Precise Location as collected.
-8. App Review Notes: Kilometre service reminders are local notifications sent after a trip is saved or when the app opens. They are not sent while a trip is recording or paused, and the app never asks for the odometer during a drive. Report a problem opens system Mail or the share sheet only after the user confirms. There is no automatic upload, analytics, or tracking. The attachment has no coordinates, names, or photos. Reviewer devices without Apple Mail should use the share-sheet fallback. Settings → About → Support the developer opens three optional consumable tips (In-App Purchase). They unlock nothing. Say that in the notes so the row is documented, not hidden from review. The first manual Start shows a one-time “Eyes on the road” alert (don’t use the phone while driving; a passenger uses the map and controls); Shortcut and automation starts record on their own without UI. Settings → About → Acknowledgements credits the CC BY-SA trip sounds. Planned route: start a trip, open the live map (map button on the recording card), tap **Destination** just above the recording card and pick a saved place (add one first under Settings → Favorite places) — Apple Maps driving directions draw as a lighter line ahead of the car with remaining distance and arrival time; tap the chip again → **Remove route**. Typing a place search is locked while the car is moving (over about 7 km/h) unless the trip is paused; saved places stay one tap so the driver never types. Directions come from Apple MapKit only; Trailhound has no server and never saves the destination.
+8. App Review Notes: Kilometre service reminders are local notifications sent after a trip is saved or when the app opens. They are not sent while a trip is recording or paused, and the app never asks for the odometer during a drive. Report a problem opens system Mail or the share sheet only after the user confirms. There is no automatic upload, analytics, or tracking. The attachment has no coordinates, names, or photos. Reviewer devices without Apple Mail should use the share-sheet fallback. Settings → About → Support the developer opens three optional consumable tips (In-App Purchase). They unlock nothing. Say that in the notes so the row is documented, not hidden from review. The first manual Start shows a one-time “Eyes on the road” alert (don’t use the phone while driving; a passenger uses the map and controls); Shortcut and automation starts record on their own without UI. Settings → About → Acknowledgements credits the CC BY-SA trip sounds. Planned route: start a trip, open the live map (map button on the recording card), tap **Destination** just above the recording card and pick a saved place (add one first under Settings → Favorite places) — Apple Maps driving directions draw as a lighter line ahead of the car with remaining distance and arrival time; tap the chip again → **Remove route**. Typing a place search is locked while the car is moving (over about 7 km/h) unless the trip is paused; saved places stay one tap so the driver never types. Directions come from Apple MapKit only; Milehound has no server and never saves the destination.
 9. Privacy manifest warning: if an upload returns **ITMS-91053** for `NSPrivacyAccessedAPICategoryFileTimestamp`, add that category with reason `C617.1` to both `PrivacyInfo.xcprivacy` files. Today `attributesOfItem` reads only file size (`DevLog`, `ModelContainerFactory`), so it is not declared.
 
 ## TestFlight
@@ -45,7 +45,7 @@ These items are also mirrored in code as `DeviceTestChecklist` (`DeviceTestCheck
 - [ ] **30+ min real drive** — distance and duration advance
 - [ ] **Background** — background the app, wait 5 min: recording continues
 - [ ] **Shortcuts auto-start** — recording starts when connecting to the car (Bluetooth / CarPlay / Wi‑Fi automation)
-- [ ] **Shortcuts wizard test** — Pairing guide “Test start in Trailhound”; session discards on “This was a test, stop”
+- [ ] **Shortcuts wizard test** — Pairing guide “Test start in Milehound”; session discards on “This was a test, stop”
 - [ ] **Shortcuts vehicle pick** — separate CarPlay vs Bluetooth automations assign different vehicles on Start trip
 - [ ] **Shortcuts auto-stop** — recording stops when leaving the car
 - [ ] **Orphan recovery** — force-quit → reopen → orphan banner / recovery
@@ -61,7 +61,7 @@ Optional smoke:
 - [ ] **Live map planned route** — Destination → saved place: lighter solid route line only ahead of the car (nothing beside the driven trail), finish pin, chip shows distance · ~arrival; drive off route → re-plans within ~8 s; the next turn (distance, then Apple’s instruction) shows above the cluster and hides while recalculating; close and reopen the map → route still there; airplane mode before picking → “Offline” chip; arrive within 50 m → route clears; moving → search still accepts a new place; Stop trip → Destination chip is back next trip. Check phone, landscape, closed/open Duo and iPad (centered form)
 - [ ] **Widget / Siri** — start / stop recording via widget or Siri shortcut
 - [ ] **Export** — JSON, CSV, GPX, or KML
-- [ ] **Report a problem** — Settings → About → Report a problem; confirm disclosure; Mail or share sheet attaches `trailhound-debug.txt`; no Dev Log tab
+- [ ] **Report a problem** — Settings → About → Report a problem; confirm disclosure; Mail or share sheet attaches `milehound-debug.txt`; no Dev Log tab
 
 ## Vehicle care & expenses (V13)
 
@@ -98,7 +98,7 @@ Optional smoke:
 
 - [ ] **Year recap** — Recap tab: year awards first, badges, frequent-routes map, month cost forecast, recap poster last + Get your Recap + chapter rail (pump fuel on its own line). January invitation overlay for 7 days.
 - [ ] **Year recap share** — story Share circle exports the visible 9:16 JPEG; Instagram Stories opens the page image; WhatsApp / Messages keep the page title caption
-- [ ] **Badge share** — unlocked gallery chip is a compact palette-tint Share control; the sheet gets a 9:16 medal JPEG (icon + glass card + Trailhound mark), not title text; Instagram Stories gets the image without caption text
+- [ ] **Badge share** — unlocked gallery chip is a compact palette-tint Share control; the sheet gets a 9:16 medal JPEG (icon + glass card + Milehound mark), not title text; Instagram Stories gets the image without caption text
 - [ ] **Widgets** — goal ring, last trip, cost summary; Last Trip route preview toggle under Settings → Privacy
 - [ ] **Schema upgrade** — existing journal + smart-category data survive; locality/caches backfill without store reset
 
@@ -106,7 +106,7 @@ Optional smoke:
 
 - Auto start/stop is set up via **Shortcuts** (wizard under the Pairing tab): named Shortcut with **Vehicle**, then Personal Automation → **Run Shortcut**.
 - On **Start trip**, set **Vehicle** in that named Shortcut (Personal Automations often hide the picker).
-- In-app test proves Trailhound handles the external start; it does **not** prove the car automation fired. Stop the test session so an empty trip is not saved.
+- In-app test proves Milehound handles the external start; it does **not** prove the car automation fired. Stop the test session so an empty trip is not saved.
 - “Not working” checklist: Ask Before Running off, Run Shortcut (not a bare Start trip), Location Always, silent start.
 - In-app Bluetooth audio-route matching was removed; no extra Bluetooth entitlement is required.
 - Location + background location mode are used only during an active recording.
@@ -114,14 +114,14 @@ Optional smoke:
 ## App Store submission
 
 - [ ] **Paid Apps Agreement** — signed in App Store Connect → Business, with banking and tax forms complete. Tips do not load without it
-- [ ] **Tips** — create the consumables `com.trailhound.app.tip.small`, `.medium`, and `.large` (names and prices as in `Trailhound/TrailhoundTips.storekit`). Add a review screenshot of the Support sheet to each and submit them with this version
+- [ ] **Tips** — create the consumables `com.milehound.app.tip.small`, `.medium`, and `.large` (names and prices as in `Milehound/MilehoundTips.storekit`). Add a review screenshot of the Support sheet to each and submit them with this version
 - [ ] **Small Business Program** — enroll (later) for 15% instead of 30% commission
-- [ ] **Marketing URL** — `https://github.com/nurettinbas/Trailhound#support-the-developer` (the README section, not the in-app Privacy or Support pages)
+- [ ] **Marketing URL** — `https://github.com/nurettinbas/Milehound#support-the-developer` (the README section, not the in-app Privacy or Support pages)
 - [ ] **Store text** — description, screenshots, creative assets, and What’s New do not mention the IBAN or bank transfer
 - [ ] **Age rating** — answer the current App Store Connect questionnaire
 - [ ] **Screenshots** — iPhone set plus 13-inch iPad (the app supports iPad; widgets are iPhone and iPad)
 - [ ] **Privacy** — label is Data Not Collected, matching both `PrivacyInfo.xcprivacy` files (app and widget, UserDefaults reasons `CA92.1` and `1C8F.1`)
-- [ ] **Export compliance** — `ITSAppUsesNonExemptEncryption` is `false` in `Trailhound/Info.plist`, so the upload question should not repeat
+- [ ] **Export compliance** — `ITSAppUsesNonExemptEncryption` is `false` in `Milehound/Info.plist`, so the upload question should not repeat
 - [ ] **EU DSA** — selling In-App Purchases makes you a trader on EU storefronts; enter the trader contact details, or leave EU storefronts off
 - [ ] **Review notes** — Shortcuts automation, background location (attach a short video), Live Activity and CarPlay tile, the Settings → About → Support the developer row (tips unlock nothing), the one-time driving safety alert, and Acknowledgements
 - [ ] **KVKK / GDPR** — `docs/PRIVACY.md` and `docs/PRIVACY_TR.md` list rights, legal basis, transfer, and complaint routes; confirm VERBİS exemption (individual developer, under the employee and balance-sheet thresholds, no special-category data)

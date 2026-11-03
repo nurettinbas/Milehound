@@ -1,6 +1,6 @@
 # Gizlilik Politikası ve KVKK Aydınlatma Metni
 
-Trailhound, gizliliği önceleyen bir yolculuk kaydedicidir. Rotalar, araçlar, yerler ve harcamalar iPhone’undaki yerel SwiftData deposunda kalır. Hesap, bulut sunucusu, analitik veya reklam SDK’sı yoktur.
+Milehound, gizliliği önceleyen bir yolculuk kaydedicidir. Rotalar, araçlar, yerler ve harcamalar iPhone’undaki yerel SwiftData deposunda kalır. Hesap, bulut sunucusu, analitik veya reklam SDK’sı yoktur.
 
 Bu metin, 6698 sayılı Kişisel Verilerin Korunması Kanunu’nun (KVKK) 10. maddesi kapsamındaki aydınlatma metnidir. Uygulama dili Türkçe olduğunda **Ayarlar → Hakkında → Gizlilik Politikası** bu sayfayı açar. English: [Privacy policy](PRIVACY.md).
 
@@ -14,11 +14,11 @@ Nurettin Baş — [nurettin.bas@icloud.com](mailto:nurettin.bas@icloud.com)
 - Harcamaya eklediğin fiş fotoğrafları ve bunlardan okunan tutar
 - Yalnızca **Sorun bildir** ile göndermeyi seçersen kullanılan tanı günlüğü
 
-**Tutarı oku** özelliği Apple’ın cihaz üzerindeki metin tanıma (Vision) teknolojisini kullanır. Fotoğraf ve okunan metin iPhone’unda işlenir; Trailhound’a, bir yapay zekâ servisine ya da herhangi bir sunucuya gönderilmez.
+**Tutarı oku** özelliği Apple’ın cihaz üzerindeki metin tanıma (Vision) teknolojisini kullanır. Fotoğraf ve okunan metin iPhone’unda işlenir; Milehound’a, bir yapay zekâ servisine ya da herhangi bir sunucuya gönderilmez.
 
-Konum yalnızca yolculuk kaydı için kullanılır ve sen tanı raporunu e-postayla göndermedikçe Trailhound’a ulaşmaz. O rapor da koordinat, adres, yer adı, araç adı, fotoğraf veya not içermez.
+Konum yalnızca yolculuk kaydı için kullanılır ve sen tanı raporunu e-postayla göndermedikçe Milehound’a ulaşmaz. O rapor da koordinat, adres, yer adı, araç adı, fotoğraf veya not içermez.
 
-**Harita ve yol tarifi (Apple MapKit):** Harita görüntüsü, yer araması, yolculuk başı ve sonundaki sokak adları ve canlı haritadaki **planlanan yol** Apple’ın MapKit hizmetinden gelir. Canlı haritada bir varış noktası seçtiğinde, sürüş tarifi almak için o anki konumun ve varış noktası Apple’a gönderilir. Apple’ın yanıtındaki sıradaki dönüş ve mesafesi haritada gösterilir ve kaydedilmez. Yer araması yazdığında aranan metin ve harita bölgesi Apple’a gider. Bu istekler iPhone’undan doğrudan Apple’a, [Apple’ın gizlilik politikası](https://www.apple.com/tr/legal/privacy/) kapsamında gider. Arada Trailhound sunucusu yoktur; Trailhound bu verileri almaz. Varış noktası ve planlanan yol kaydedilmez; yalnızca o kayıt sürerken bellekte tutulur ve kayıt bitince silinir.
+**Harita ve yol tarifi (Apple MapKit):** Harita görüntüsü, yer araması, yolculuk başı ve sonundaki sokak adları ve canlı haritadaki **planlanan yol** Apple’ın MapKit hizmetinden gelir. Canlı haritada bir varış noktası seçtiğinde, sürüş tarifi almak için o anki konumun ve varış noktası Apple’a gönderilir. Apple’ın yanıtındaki sıradaki dönüş ve mesafesi haritada gösterilir ve kaydedilmez. Yer araması yazdığında aranan metin ve harita bölgesi Apple’a gider. Bu istekler iPhone’undan doğrudan Apple’a, [Apple’ın gizlilik politikası](https://www.apple.com/tr/legal/privacy/) kapsamında gider. Arada Milehound sunucusu yoktur; Milehound bu verileri almaz. Varış noktası ve planlanan yol kaydedilmez; yalnızca o kayıt sürerken bellekte tutulur ve kayıt bitince silinir.
 
 Bu veriler geliştirici tarafından işlenmez; kontrol tamamen sendedir.
 
@@ -26,7 +26,7 @@ Bu veriler geliştirici tarafından işlenmez; kontrol tamamen sendedir.
 
 | Veri | Amaç | Hukuki sebep |
 |------|------|--------------|
-| **Sorun bildir** ile gönderdiğin tanı dosyası (`trailhound-debug.txt`): zaman damgaları, kayıt başlat/durdur/duraklat olayları, Bluetooth / Canlı Etkinlik / widget olayları, hız, mesafe, GPS doğruluğu, yolculuk kimliği önekleri | Bildirdiğin sorunu bulmak ve gidermek | Her gönderimde ayrıca verdiğin **açık rıza** (KVKK m.5/1) |
+| **Sorun bildir** ile gönderdiğin tanı dosyası (`milehound-debug.txt`): zaman damgaları, kayıt başlat/durdur/duraklat olayları, Bluetooth / Canlı Etkinlik / widget olayları, hız, mesafe, GPS doğruluğu, yolculuk kimliği önekleri | Bildirdiğin sorunu bulmak ve gidermek | Her gönderimde ayrıca verdiğin **açık rıza** (KVKK m.5/1) |
 | Bize yazdığın e-posta ve e-posta adresin | Talebini yanıtlamak | Bir hakkın tesisi, kullanılması veya korunması ve talebinin yerine getirilmesi (KVKK m.5/2-c, m.5/2-f) |
 
 Bu veriler takip, reklam, pazarlama veya analitik için kullanılmaz.
@@ -45,7 +45,7 @@ Veriler yalnızca **senin başlattığın** bir işlemle toplanır: Ayarlar → 
 
 Veriler üçüncü kişilere satılmaz veya pazarlama amacıyla aktarılmaz. Raporlar ve e-postalar geliştiricinin Apple iCloud Mail kutusuna ulaşır. Apple bu iletileri Türkiye dışındaki sunucularda saklayabilir. Bu aktarım yalnızca senin göndermeni seçtiğin anda, talebini yanıtlamak amacıyla gerçekleşir (KVKK m.9). Başka bir e-posta sağlayıcısı (ör. Gmail) seçersen ileti o sağlayıcının koşullarına göre işlenir.
 
-Bahşiş (destek) ödemelerini Apple, Uygulama İçi Satın Alma ile işler. Trailhound kart bilgini, Apple hesabını veya kimliğini görmez; bahşiş hiçbir özelliğin kilidini açmaz.
+Bahşiş (destek) ödemelerini Apple, Uygulama İçi Satın Alma ile işler. Milehound kart bilgini, Apple hesabını veya kimliğini görmez; bahşiş hiçbir özelliğin kilidini açmaz.
 
 ## 7. KVKK m.11 kapsamındaki hakların
 
@@ -66,7 +66,7 @@ Yanıtı yeterli bulmazsan [Kişisel Verileri Koruma Kurumu](https://www.kvkk.go
 
 ## 8. Çocuklar
 
-Trailhound bir sürüş günlüğüdür ve çocuklara yönelik değildir. Hiç kimseden, çocuklar dahil, bilerek veri toplamaz.
+Milehound bir sürüş günlüğüdür ve çocuklara yönelik değildir. Hiç kimseden, çocuklar dahil, bilerek veri toplamaz.
 
 ## 9. Seçeneklerin
 

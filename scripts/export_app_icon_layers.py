@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Rebuild Trailhound.icon Symbol.png from the 1024 AppIcon master (Liquid Glass).
+"""Rebuild Milehound.icon Symbol.png from the 1024 AppIcon master (Liquid Glass).
 
 After changing the symbol, also run scripts/export_alternate_app_icons.py so the
 19 palette Home Screen icons stay in sync.
@@ -17,8 +17,8 @@ except ImportError:
     raise
 
 ROOT = Path(__file__).resolve().parents[1]
-MASTER_ICON = ROOT / "Trailhound" / "Assets.xcassets" / "Trailhound.appiconset" / "AppIcon.png"
-SYMBOL_OUT = ROOT / "Trailhound" / "Trailhound.icon" / "Assets" / "Symbol.png"
+MASTER_ICON = ROOT / "Milehound" / "Assets.xcassets" / "Milehound.appiconset" / "AppIcon.png"
+SYMBOL_OUT = ROOT / "Milehound" / "Milehound.icon" / "Assets" / "Symbol.png"
 
 
 def export_foreground_from_master() -> Path:

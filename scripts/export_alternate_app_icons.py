@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Build Home Screen alternate icons from Symbol.png + ShellPalette fills.
 
-Keep RGB tuples in sync with TrailhoundShared/ShellPalette.swift.
+Keep RGB tuples in sync with MilehoundShared/ShellPalette.swift.
 Sky stays the primary Liquid Glass icon; this writes the other 19 palettes
 as Icon Composer .icon bundles. Do not emit alternate .appiconset folders —
 Xcode 26 treats those as having an unassigned Dark [1d] child.
@@ -21,10 +21,10 @@ except ImportError:
     raise
 
 ROOT = Path(__file__).resolve().parents[1]
-SYMBOL = ROOT / "Trailhound" / "Trailhound.icon" / "Assets" / "Symbol.png"
-ASSETS = ROOT / "Trailhound" / "Assets.xcassets"
-PRIMARY_SET = ASSETS / "Trailhound.appiconset"
-ICON_DIR = ROOT / "Trailhound" / "AppIcons"
+SYMBOL = ROOT / "Milehound" / "Milehound.icon" / "Assets" / "Symbol.png"
+ASSETS = ROOT / "Milehound" / "Assets.xcassets"
+PRIMARY_SET = ASSETS / "Milehound.appiconset"
+ICON_DIR = ROOT / "Milehound" / "AppIcons"
 
 # light.tint / dark.mid — same numbers as ShellPalette recipes.
 # Sky light uses the Icon Composer fill so the raster fallback matches glass.

@@ -1,6 +1,6 @@
 # Shortcuts auto-record
 
-Trailhound starts and stops trips through **Shortcuts Personal Automations**. Apple does not let a third-party app write those automations for you. The in-app wizard remembers the trigger and vehicle, shows the right Shortcuts steps, hands off with `ShortcutsLink`, tests that Trailhound handles an external start, and offers a “not working” checklist.
+Milehound starts and stops trips through **Shortcuts Personal Automations**. Apple does not let a third-party app write those automations for you. The in-app wizard remembers the trigger and vehicle, shows the right Shortcuts steps, hands off with `ShortcutsLink`, tests that Milehound handles an external start, and offers a “not working” checklist.
 
 ## Where
 
@@ -14,7 +14,7 @@ Pairing tab → **Auto-start with Shortcuts**. The same sheet opens from onboard
 4. Connect — all seven Shortcuts steps in one card, including Run Shortcut and Ask Before Running.
 5. Disconnect — four steps; End trip; Ask Before Running off.
 6. Handoff — `ShortcutsLink` + “I’ve finished Shortcuts setup”.
-7. Test — same path as `StartTripRecordingIntent` (`ShortcutStartVehicleSelection.apply` + `RecordingControlBridge.requestStartFromControlSurface`). Proves Trailhound handles the vehicle start. Does **not** prove the car automation fired. A successful test discards the session (`saveTrip: false`) so empty miles are not saved. Optional 10-minute watch is a stored `Date`, not a timer or GPS listener.
+7. Test — same path as `StartTripRecordingIntent` (`ShortcutStartVehicleSelection.apply` + `RecordingControlBridge.requestStartFromControlSurface`). Proves Milehound handles the vehicle start. Does **not** prove the car automation fired. A successful test discards the session (`saveTrip: false`) so empty miles are not saved. Optional 10-minute watch is a stored `Date`, not a timer or GPS listener.
 8. Checklist — checkable items in `UserDefaults.standard`. Pairing “Not working” opens this page.
 
 ## Storage

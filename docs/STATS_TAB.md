@@ -1,6 +1,6 @@
 # Stats tab
 
-Product layout and the performance contract for Trailhound’s Stats tab. Chrome follows the selected **shell palette** (`GlassContrast` / `StatsChartTheme`) — not a fixed brand-blue skin. No extra fetch on tab open.
+Product layout and the performance contract for Milehound’s Stats tab. Chrome follows the selected **shell palette** (`GlassContrast` / `StatsChartTheme`) — not a fixed brand-blue skin. No extra fetch on tab open.
 
 ## Card language
 
@@ -19,7 +19,7 @@ Year recap, badges, frequent routes, month forecast, and year awards live on the
 
 On an open Duo the summary column leads and the charts trail. Daily distance is a titled card on that trailing side in both the upright fold and the landscape book — not an untitled plate under the summary. When the hinge is fully open the summary column is 45% of the content and the charts are 55%. A partially open hinge keeps the seam on the fold.
 
-Deep link `trailhound://stats/goal` opens this tab. Recap / forecast / routes / achievements URLs open Recap.
+Deep link `milehound://stats/goal` opens this tab. Recap / forecast / routes / achievements URLs open Recap.
 
 See [PERFORMANCE.md](PERFORMANCE.md) Stats tab section.
 

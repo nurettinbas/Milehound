@@ -1,10 +1,10 @@
-# Trailhound
+# Milehound
 
-[![iOS Tests](https://github.com/nurettinbas/Trailhound/actions/workflows/ios-tests.yml/badge.svg)](https://github.com/nurettinbas/Trailhound/actions/workflows/ios-tests.yml)
+[![iOS Tests](https://github.com/nurettinbas/Milehound/actions/workflows/ios-tests.yml/badge.svg)](https://github.com/nurettinbas/Milehound/actions/workflows/ios-tests.yml)
 
 **Privacy-first trip recorder for iOS** — track drives with GPS, estimate fuel cost, and keep every mile on your device. No account, no cloud, no third-party SDKs.
 
-Trailhound is a native SwiftUI app built with SwiftData. It records routes locally, works offline, and can start/stop automatically via **Shortcuts Personal Automations** (Bluetooth, CarPlay, or Wi‑Fi) — or manually from the app, widget, Live Activity, and Siri.
+Milehound is a native SwiftUI app built with SwiftData. It records routes locally, works offline, and can start/stop automatically via **Shortcuts Personal Automations** (Bluetooth, CarPlay, or Wi‑Fi) — or manually from the app, widget, Live Activity, and Siri.
 
 ---
 
@@ -13,9 +13,9 @@ Trailhound is a native SwiftUI app built with SwiftData. It records routes local
 - **Cold-launch intro**: each fresh launch shows the icon’s road, hound, and corner stopwatch large on the theme color. The road matches the icon and its dashes move; the hound gallops in place, legs gathering and stretching with a flexing back. The stopwatch’s crown is pressed, its hands sweep a little fast, and it rocks like a watch held in the hand. Everything then coasts to rest as the theme plate closes from the corners into the app icon, which lands with a soft haptic and fades out. About 1.7 seconds in all. Tap anywhere to skip. It does not replay when returning from the background, and it is skipped for Shortcut or widget starts, deep links, and VoiceOver. Reduce Motion shows a still mark. The **Start** control on every tab uses that same in-place gallop
 
 ### Recording
-- Manual start/stop, pause/resume. **Start** (with the vehicle picker) sits on every tab and returns to the Trips recording card. Its hound runs in place with the same jointed gallop as the launch intro. It hides while a trip is already recording or paused. The notification bell stays while a trip is recording. Once the recording card scrolls off screen, the steering-wheel control stays in the Trips bar and returns to that card, including landscape when the card scrolls with the list. A wide landscape iPhone keeps that card on the leading side, so the control stays hidden. On that short screen the Trailhound title hides while recording, the road uses the compact scene, and duration, speed, distance, and average sit on one row, so Pause and Stop stay above the tab bar. Rotating does not flash that control while the card is still at the top of the list
+- Manual start/stop, pause/resume. **Start** (with the vehicle picker) sits on every tab and returns to the Trips recording card. Its hound runs in place with the same jointed gallop as the launch intro. It hides while a trip is already recording or paused. The notification bell stays while a trip is recording. Once the recording card scrolls off screen, the steering-wheel control stays in the Trips bar and returns to that card, including landscape when the card scrolls with the list. A wide landscape iPhone keeps that card on the leading side, so the control stays hidden. On that short screen the Milehound title hides while recording, the road uses the compact scene, and duration, speed, distance, and average sit on one row, so Pause and Stop stay above the tab bar. Rotating does not flash that control while the card is still at the top of the list
 - **Eyes on the road**: the first manual Start shows a one-time reminder not to use the phone while driving (a passenger uses the map and controls). Shortcut and automation starts record on their own and never show it
-- **Shortcuts auto-start / auto-stop**: Create a named Shortcut per vehicle (*Start trip* + **Vehicle**), then a Personal Automation that **Run Shortcut**s it on Bluetooth / CarPlay / Wi‑Fi connect (automations often hide the Vehicle picker). The **Pairing** setup wizard remembers the trigger and vehicle, shows every Shortcuts step (including Run Shortcut), tests that Trailhound handles an external start, and includes a not-working checklist. Apple cannot let Trailhound create the automation for you. See [Shortcuts auto-record](docs/SHORTCUTS_AUTORECORD.md)
+- **Shortcuts auto-start / auto-stop**: Create a named Shortcut per vehicle (*Start trip* + **Vehicle**), then a Personal Automation that **Run Shortcut**s it on Bluetooth / CarPlay / Wi‑Fi connect (automations often hide the Vehicle picker). The **Pairing** setup wizard remembers the trigger and vehicle, shows every Shortcuts step (including Run Shortcut), tests that Milehound handles an external start, and includes a not-working checklist. Apple cannot let Milehound create the automation for you. See [Shortcuts auto-record](docs/SHORTCUTS_AUTORECORD.md)
 - Vehicle profiles with fuel/EV cost per trip
 - **Avg fuel**: catalog cost from `distance × consumption × price`, shown as currency · litres (or kWh) like Estimated fuel. Trip detail **Avg fuel calculate** (with ?) edits consumption and unit price; the live line is **Avg fuel estimate**. Defaults from the vehicle and Settings
 - **Estimated fuel**: starts from this vehicle’s average (`C₀`), then adds GPS litres for this trip. Short stop-go is usually above your average; a steady highway trip is usually below. Shown as currency · litres (or kWh) · L/100 on trip detail, with driving efficiency, traffic, and factor chips; Stats totals match after backfill. A Stop pin is not engine-off. Not a pump reading.
@@ -54,13 +54,13 @@ Trailhound is a native SwiftUI app built with SwiftData. It records routes local
 - **Report a problem** from Settings → About (optional): you can mail a sanitized diagnostic log to support. No analytics, no automatic upload, no Dev Log tab; on-device logs expire after 30 days. See [Privacy](docs/PRIVACY.md) and [Support](docs/SUPPORT.md)
 - In-app **Privacy Policy** under Settings → About (same text as [docs/PRIVACY.md](docs/PRIVACY.md)). A Turkish UI opens the Turkish policy and KVKK notice ([docs/PRIVACY_TR.md](docs/PRIVACY_TR.md)). Both list your GDPR / KVKK rights, legal basis, retention, international transfer, and where to complain
 - **Acknowledgements** under Settings → About credit the CC BY-SA 3.0 trip start and stop sounds (Edvvc, Wikimedia Commons). See [docs/ACKNOWLEDGEMENTS.md](docs/ACKNOWLEDGEMENTS.md)
-- **Support the developer**: Settings → About → Support the developer offers three optional tips through Apple In-App Purchase, on every App Store storefront. A tip unlocks nothing, and Apple handles the payment. Trailhound never sees your card or account
+- **Support the developer**: Settings → About → Support the developer offers three optional tips through Apple In-App Purchase, on every App Store storefront. A tip unlocks nothing, and Apple handles the payment. Milehound never sees your card or account
 - Settings → About ends with **Developed by Nurettin Baş**
 
 ### Appearance
 - **Personalization** opens with a **Light / Dark** switch, directly above Appearance: the sun becomes a moon, the knob springs across, and the rest of the app crossfades. With no saved choice the app **matches the iPhone**. **Personalization → Appearance** repeats that switch, holds **Match iPhone**, and holds the **20-color shell palette** (Sky, Ocean, Teal, Mint, Forest, Lime, Gold, Sunset, Orange, Coral, Rose, Pink, Magenta, Purple, Violet, Indigo, Slate, Graphite, Sand, Ember; default Sky) and **Text size** (Small, Default, Large, Extra large). Text size steps from the iPhone's Dynamic Type setting; Default leaves it alone, and accessibility sizes are not overridden. **Personalization → Language** is English, Türkçe, or the iPhone language, and it changes immediately. Siri phrases, App Shortcuts, and notifications already delivered stay on the system language. Permission prompts follow the in-app language on the next launch. Pending vehicle-care and year-recap reminders are rewritten. **Places and categories** holds favorite places, categories, and smart categories, so the Settings list stays short. Phone Settings is one form (Recording, that page, the switch, then through About). On the open book, and on a landscape iPhone wider than the closed Duo cover, the section list is glass rows and the checkmark follows the visible form section. When the Duo hinge is fully open that list is 40% of the content and the form is 60%. That wide iPhone uses the same 40/60, and the form does not paint a second background behind the split. The section list uses short rows; only the form is the long scroller. A partially open hinge keeps the seam on the fold. The closed cover and a narrower phone keep one column
 - **Liquid Glass** (iOS 26 native `glassEffect`, Material fallback on iOS 17/18): frosted cards over the selected hue so the atmosphere shows through. Light uses native glass with a mid-family tint — not a dark chrome plate or milky white card. The glass plate clips to the card; labels in the corners are not sliced. Reduce Transparency uses an opaque mid-family fill. Dark is a deep shade of the same color. The trips-list recording card, follow path, and vehicle puck use the same hue; **Stop** on that card stays solid red. The live-map HUD (duration, speed, distance, Destination, 2D/3D, Pause, Stop) is a compact cluster of theme-tinted Liquid Glass plates in Light and Dark, rendered as one glass group so it stays light on battery; only the Stop icon is red. The tab bar is the system iOS 26 Liquid Glass bar in Light and Dark, bottom and side. Unselected items stay the system ink. The selected tab uses that appearance’s palette tint. Map toolbars stay frozen circles so MapKit is not resampled
-- The **Home Screen icon** follows the selected color (Sky keeps the Liquid Glass icon; other hues use a matching light/dark pair). iOS shows one confirmation when the icon changes. Home Screen light/dark still follows the iPhone, not the in-app Light/Dark picker. See [Design system](docs/DESIGN_SYSTEM.md) and [Appearance (wiki)](https://github.com/nurettinbas/Trailhound/wiki/Appearance)
+- The **Home Screen icon** follows the selected color (Sky keeps the Liquid Glass icon; other hues use a matching light/dark pair). iOS shows one confirmation when the icon changes. Home Screen light/dark still follows the iPhone, not the in-app Light/Dark picker. See [Design system](docs/DESIGN_SYSTEM.md) and [Appearance (wiki)](https://github.com/nurettinbas/Milehound/wiki/Appearance)
 - **Confirmation toasts** rise from the bottom, above the tab bar (or the bottom safe area on a sheet). Each one is a Liquid Glass card with a larger animated emblem and a haptic that matches the action: save, delete, merge, warning, Shortcuts automation, or a personal record. Reduce Motion keeps the fade and skips the icon motion
 
 ### Maps & analytics
@@ -74,8 +74,8 @@ Trailhound is a native SwiftUI app built with SwiftData. It records routes local
 - **Year awards** first on Recap: unfiltered calendar-year medal grid (distance, night owl, goal months, busiest day, costliest vehicle / month). Recap is the story; awards are the grid
 - Category filters, trip merge (select completed trips on the list; there is no split)
 - **Share card** from trip detail — 9:16 JPEG (same canvas as recap / badge stories) with the trip-detail glass metric grid (3 columns, icon + title + value). Instagram Stories fills edge-to-edge; Instagram / Facebook get the image only; WhatsApp / Messages / Mail keep the caption. Privacy-clipped route snapshot, Light/Dark palette, matching app icon
-- **Year recap** last on the Recap tab: compact poster hub (scene fills the glass plate, Get your Recap chip never truncates) opens a cinematic full-screen story. On iPhone that story stays upright even when the phone is already sideways; the open book and iPad keep the vertical 9:16 column. A horizontal chapter rail under the poster sits on the tab atmosphere and jumps into that story page. The first page is a title card (kicker + huge year + whisper on a vanishing-road bloom — no clipart). A purpose page names the year’s dominant category (built-in or custom) when there is a real winner, then lists every category’s share of the year’s km (percent + name + distance) — not a business-vs-personal table. A cost page shows estimated driving fuel and logged pump fuel as two separate glass cards under dual-hue pumps — never summed. Palette Canvas pages fill the cover with looping scenes, tap the left third of the screen (including the edge) to go back and the rest to go forward like Instagram (no Next), segment bars tuck under the Dynamic Island, Close and Share sit under them as Liquid Glass circles. Share exports the page you’re on (same scene and copy, 9:16 JPEG). Instagram / Facebook get the image only; WhatsApp / Messages / Mail keep that page’s title as the caption — not a leftover km poster or a bare Trailhound string. The badges page sits medals inside the glowing orbs (sparkles on the story), copy overlays the scene, Liquid Glass Share/Close. Badges unlocked that year show as the same 3D medals as the Recap gallery. The last page wraps the year (not a slogan); its segment fills like the others, then the story closes. Hold to pause. January plays the previous year; other months are year-to-date. Corridor counts are for that year only. Estimated driving fuel and logged pump fuel stay on separate lines. Replay any time. In January a 7-day full-screen invitation (Close or Get your Recap) replaces the old Dec/Jan autoplay; inbox / recap deep link still opens the story. A local notification + inbox row opens the story when last year’s recap has trips and you have not watched it yet
-- **Badges**: cumulative km (100 silver, 1,000 gold, 10,000 teal platinum, 100,000 lavender diamond — each km medal runs a different motion on the S; the full km ladder stays in the gallery even while locked), plus business / streak / cities / night / corridor ladders and trips, hours, long haul, dawn, weekend, fleet, and countries — each family has its own color, icon, and idle. Recap compact card wraps every unlocked medal in centered rows and grows down (no sideways scroll); expand is a plain toolbar glyph on the card, then a circled collapse once expanded; the card grows into a glass gallery with 3D round medals (unlocked first); locked badges show formatted progress (km or counts) without spoiling the next non-km tier. Share on an unlocked medal is a compact palette-tint chip and exports a 9:16 JPEG story card (atmosphere, Trailhound mark, glass plate, 3D medal + copy). Instagram / Facebook get the image only; WhatsApp / Messages / Mail keep the badge caption — not a title string. Newly unlocked badges celebrate on Recap (3 s each, then the next) and also land in the notifications inbox with a local banner (tap opens the gallery)
+- **Year recap** last on the Recap tab: compact poster hub (scene fills the glass plate, Get your Recap chip never truncates) opens a cinematic full-screen story. On iPhone that story stays upright even when the phone is already sideways; the open book and iPad keep the vertical 9:16 column. A horizontal chapter rail under the poster sits on the tab atmosphere and jumps into that story page. The first page is a title card (kicker + huge year + whisper on a vanishing-road bloom — no clipart). A purpose page names the year’s dominant category (built-in or custom) when there is a real winner, then lists every category’s share of the year’s km (percent + name + distance) — not a business-vs-personal table. A cost page shows estimated driving fuel and logged pump fuel as two separate glass cards under dual-hue pumps — never summed. Palette Canvas pages fill the cover with looping scenes, tap the left third of the screen (including the edge) to go back and the rest to go forward like Instagram (no Next), segment bars tuck under the Dynamic Island, Close and Share sit under them as Liquid Glass circles. Share exports the page you’re on (same scene and copy, 9:16 JPEG). Instagram / Facebook get the image only; WhatsApp / Messages / Mail keep that page’s title as the caption — not a leftover km poster or a bare Milehound string. The badges page sits medals inside the glowing orbs (sparkles on the story), copy overlays the scene, Liquid Glass Share/Close. Badges unlocked that year show as the same 3D medals as the Recap gallery. The last page wraps the year (not a slogan); its segment fills like the others, then the story closes. Hold to pause. January plays the previous year; other months are year-to-date. Corridor counts are for that year only. Estimated driving fuel and logged pump fuel stay on separate lines. Replay any time. In January a 7-day full-screen invitation (Close or Get your Recap) replaces the old Dec/Jan autoplay; inbox / recap deep link still opens the story. A local notification + inbox row opens the story when last year’s recap has trips and you have not watched it yet
+- **Badges**: cumulative km (100 silver, 1,000 gold, 10,000 teal platinum, 100,000 lavender diamond — each km medal runs a different motion on the S; the full km ladder stays in the gallery even while locked), plus business / streak / cities / night / corridor ladders and trips, hours, long haul, dawn, weekend, fleet, and countries — each family has its own color, icon, and idle. Recap compact card wraps every unlocked medal in centered rows and grows down (no sideways scroll); expand is a plain toolbar glyph on the card, then a circled collapse once expanded; the card grows into a glass gallery with 3D round medals (unlocked first); locked badges show formatted progress (km or counts) without spoiling the next non-km tier. Share on an unlocked medal is a compact palette-tint chip and exports a 9:16 JPEG story card (atmosphere, Milehound mark, glass plate, 3D medal + copy). Instagram / Facebook get the image only; WhatsApp / Messages / Mail keep the badge caption — not a title string. Newly unlocked badges celebrate on Recap (3 s each, then the next) and also land in the notifications inbox with a local banner (tap opens the gallery)
 - **Frequent-routes map** (Recap card expands as the MapKit map itself) — road polylines + heatmap; privacy-safe home/work labels; habit corridors in the same city as your top run)
 - **Month cost forecast** on Recap: Recap-style poster hub (Canvas sparkline, title chip, amount on a bottom atmosphere gradient — no whitish veil) with driving fuel estimate + this month’s installments and other expenses (logged pump fuel is a separate line, never double-counted into the hero total); expand mix bar uses the shell tint for estimated fuel and rotated hues for installments / other; the hub card grows into a full-screen poster and frost breakdown like Badges (atmosphere + glass, not a grouped list)
 - **Favorite place filter** on Trips and Stats (start or end matches a saved place); charts and summary follow the same filters independently per tab
@@ -113,7 +113,7 @@ Trailhound is a native SwiftUI app built with SwiftData. It records routes local
 
 ### Why iOS 17?
 
-Trailhound uses **SwiftData**, **App Intents**, **Live Activities**, and modern **WidgetKit** APIs that require iOS 17. The project does not build for iOS 16 or earlier. The **CarPlay Dashboard Live Activity** layout (vehicle icon plus duration, distance, and speed) needs **iOS 18** (`activityFamily.small`); on iOS 17 the Home Screen widgets still work, but the Live Activity presentation targets iOS 18+.
+Milehound uses **SwiftData**, **App Intents**, **Live Activities**, and modern **WidgetKit** APIs that require iOS 17. The project does not build for iOS 16 or earlier. The **CarPlay Dashboard Live Activity** layout (vehicle icon plus duration, distance, and speed) needs **iOS 18** (`activityFamily.small`); on iOS 17 the Home Screen widgets still work, but the Live Activity presentation targets iOS 18+.
 
 ### Device & permissions
 
@@ -136,22 +136,22 @@ Trailhound uses **SwiftData**, **App Intents**, **Live Activities**, and modern 
 | **Swift** | 5.0 (strict concurrency enabled) |
 | **iOS deployment target** | 17.0 |
 | **Dependencies** | None (Apple frameworks only) |
-| **Bundle IDs** | `com.trailhound.app` · `com.trailhound.app.widget` |
-| **App Group** | `group.com.trailhound.app` |
+| **Bundle IDs** | `com.milehound.app` · `com.milehound.app.widget` |
+| **App Group** | `group.com.milehound.app` |
 
 ---
 
 ## Getting started
 
 ```bash
-git clone https://github.com/nurettinbas/Trailhound.git
-cd Trailhound
-open Trailhound.xcodeproj
+git clone https://github.com/nurettinbas/Milehound.git
+cd Milehound
+open Milehound.xcodeproj
 ```
 
 1. Select an **iPhone** simulator or device
-2. Update **Signing & Capabilities** with your Team (bundle ID: `com.trailhound.app`)
-3. Ensure App Group `group.com.trailhound.app` is enabled for app + widget targets
+2. Update **Signing & Capabilities** with your Team (bundle ID: `com.milehound.app`)
+3. Ensure App Group `group.com.milehound.app` is enabled for app + widget targets
 4. Press **⌘R** to run
 
 ### Simulator quick test
@@ -200,11 +200,11 @@ CI runs the same script via GitHub Actions (`.github/workflows/ios-tests.yml`): 
 
 Requires **iOS 17+** and **Siri / Shortcuts** available. After first launch:
 
-1. Open **Pairing** in Trailhound → follow **Auto-start with Shortcuts**
-2. Or open **Shortcuts** → search **Trailhound** and add: **Start trip**, **Pause trip**, **Resume trip**, **End trip**
+1. Open **Pairing** in Milehound → follow **Auto-start with Shortcuts**
+2. Or open **Shortcuts** → search **Milehound** and add: **Start trip**, **Pause trip**, **Resume trip**, **End trip**
 3. For hands-free start/stop: create a named Shortcut with **Start trip** + **Vehicle**, then a Personal Automation that uses **Run Shortcut** on Bluetooth / CarPlay / Wi‑Fi connect (and **End trip** on disconnect). Automations often hide the Vehicle picker if you add Start trip directly.
 
-**Siri examples:** *“Start trip in Trailhound”*, *“Pause trip in Trailhound”* (Turkish phrases are also registered for TR Siri language)
+**Siri examples:** *“Start trip in Milehound”*, *“Pause trip in Milehound”* (Turkish phrases are also registered for TR Siri language)
 
 > Siri language and system language can differ. Shortcuts list follows system language; voice phrases follow Siri language.
 >
@@ -215,17 +215,17 @@ Requires **iOS 17+** and **Siri / Shortcuts** available. After first launch:
 ## Project structure
 
 ```
-Trailhound/
+Milehound/
 ├── App/              # App entry, runtime bootstrap, scene lifecycle
 ├── Models/           # SwiftData models (Trip, VehicleProfile, …)
 ├── Services/         # Location, recording, geocoding, export, pairing
 ├── Views/            # SwiftUI screens (incl. Pairing Shortcuts guide)
 ├── Intents/          # App Intents & Siri Shortcuts
 ├── Utilities/        # L10n, migrations
-TrailhoundShared/        # App Group bridge (widget, Live Activity, deep links)
-TrailhoundWidget/        # WidgetKit + Live Activity extension
-TrailhoundTests/         # Unit + integration tests
-TrailhoundUITests/       # UI smoke tests (XCUITest)
+MilehoundShared/        # App Group bridge (widget, Live Activity, deep links)
+MilehoundWidget/        # WidgetKit + Live Activity extension
+MilehoundTests/         # Unit + integration tests
+MilehoundUITests/       # UI smoke tests (XCUITest)
 scripts/              # CI simulator pick + xcodebuild test runner
 docs/                 # Battery, design system, Stats, TestFlight, privacy, support
 ```
@@ -238,20 +238,20 @@ docs/                 # Battery, design system, Stats, TestFlight, privacy, supp
 
 - [Battery optimization](docs/BATTERY_OPTIMIZATION.md)
 - [Design system](docs/DESIGN_SYSTEM.md) — Liquid Glass, 20-color shell palette, engine rules, tokens
-- [Appearance (wiki)](https://github.com/nurettinbas/Trailhound/wiki/Appearance) — Settings theme, palette, Home Screen icon, share cards
+- [Appearance (wiki)](https://github.com/nurettinbas/Milehound/wiki/Appearance) — Settings theme, palette, Home Screen icon, share cards
 - [UI performance notes](docs/PERFORMANCE.md) — live follow map camera, route drawing, trip-list scroll, Stats cards, glass budget
 - [Fuel estimation](docs/FUEL_ESTIMATION.md) — Avg vs estimated fuel, additive GPS litres, backfill v6 / rollup 14
-- [Fuel estimation (wiki)](https://github.com/nurettinbas/Trailhound/wiki/Fuel-Estimation) — Avg vs estimated, not a pump reading
+- [Fuel estimation (wiki)](https://github.com/nurettinbas/Milehound/wiki/Fuel-Estimation) — Avg vs estimated, not a pump reading
 - [Stats tab](docs/STATS_TAB.md) — filter card, card spans, nested tiles, deferred charts
 - [Recap tab](docs/YEAR_TAB.md) — year awards first, badges, frequent routes, Recap-style month forecast, year recap last
-- [Stats (wiki)](https://github.com/nurettinbas/Trailhound/wiki/Stats) — glass cards, filters, comparison
-- [Recap (wiki)](https://github.com/nurettinbas/Trailhound/wiki/Recap) — Recap tab, year awards, story, badges, routes, forecast
-- [Architecture (wiki)](https://github.com/nurettinbas/Trailhound/wiki/Architecture) — schema **V23**, models, premium derived caches
-- [Device support (wiki)](https://github.com/nurettinbas/Trailhound/wiki/Device-Support) — iPhone, wide landscape book, Duo, iPad pane shares
-- [Notifications (wiki)](https://github.com/nurettinbas/Trailhound/wiki/Notifications) — inbox, book preview, trip deep links
-- [Live follow map](https://github.com/nurettinbas/Trailhound/wiki/Live-Follow) — product flow and MapKit drawing (wiki)
+- [Stats (wiki)](https://github.com/nurettinbas/Milehound/wiki/Stats) — glass cards, filters, comparison
+- [Recap (wiki)](https://github.com/nurettinbas/Milehound/wiki/Recap) — Recap tab, year awards, story, badges, routes, forecast
+- [Architecture (wiki)](https://github.com/nurettinbas/Milehound/wiki/Architecture) — schema **V23**, models, premium derived caches
+- [Device support (wiki)](https://github.com/nurettinbas/Milehound/wiki/Device-Support) — iPhone, wide landscape book, Duo, iPad pane shares
+- [Notifications (wiki)](https://github.com/nurettinbas/Milehound/wiki/Notifications) — inbox, book preview, trip deep links
+- [Live follow map](https://github.com/nurettinbas/Milehound/wiki/Live-Follow) — product flow and MapKit drawing (wiki)
 - [Shortcuts auto-record](docs/SHORTCUTS_AUTORECORD.md) — Personal Automation wizard, honest test, checklist
-- [Shortcuts (wiki)](https://github.com/nurettinbas/Trailhound/wiki/Shortcuts) — Pairing wizard, named Shortcut + Run Shortcut
+- [Shortcuts (wiki)](https://github.com/nurettinbas/Milehound/wiki/Shortcuts) — Pairing wizard, named Shortcut + Run Shortcut
 - [TestFlight release checklist](docs/TESTFLIGHT_RELEASE.md)
 - [Vehicle care & expenses](docs/VEHICLE_CARE_PLAN.md) — reminders vs costs, monthly installments, UI layout, notification rules
 - [Travel journal](docs/TRAVEL_JOURNAL_PLAN.md) — Seyahat grouping, suggestion rules, schema V19
@@ -276,7 +276,7 @@ Issues and pull requests are welcome. Please open an issue before large changes.
 
 ## Support the developer
 
-Trailhound is free. There are no ads and no account. Support is optional and does not unlock any feature.
+Milehound is free. There are no ads and no account. Support is optional and does not unlock any feature.
 
 - **In the app:** Settings → About → Support the developer. Three tips through Apple In-App Purchase; Apple handles the payment and refunds.
 - **Bank transfer (outside the app):** if you prefer, send a transfer from your own bank. The app does not show or link to these details.

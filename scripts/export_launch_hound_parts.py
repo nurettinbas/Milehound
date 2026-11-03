@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Cut the TrailhoundHound silhouette into a gallop rig for the cold-launch intro.
+"""Cut the MilehoundHound silhouette into a gallop rig for the cold-launch intro.
 
 Writes the part imagesets on the original canvas, so every part lines up with the logo
 when drawn in the same rect: front and rear body (split at the spine), tail, and each leg
@@ -29,10 +29,10 @@ except ImportError:
     raise
 
 ROOT = Path(__file__).resolve().parents[1]
-ASSETS = ROOT / "Trailhound" / "Assets.xcassets"
-SOURCE = ASSETS / "TrailhoundHound.imageset" / "TrailhoundHound.png"
+ASSETS = ROOT / "Milehound" / "Assets.xcassets"
+SOURCE = ASSETS / "MilehoundHound.imageset" / "MilehoundHound.png"
 PREVIEW = Path("/tmp/hound_rig_preview.png")
-PREFIX = "TrailhoundHound"
+PREFIX = "MilehoundHound"
 
 SOLID = 128
 EDGE_GROW = 2
@@ -473,7 +473,7 @@ def swift_rig(size, joints, curves):
             ]
         ),
         bob: {swift_curve(curves.get('bob'))},
-        stride: TrailhoundMotion.launchIntroGallopStride
+        stride: MilehoundMotion.launchIntroGallopStride
     )"""
 
 
