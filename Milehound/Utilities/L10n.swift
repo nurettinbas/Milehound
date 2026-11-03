@@ -94,6 +94,30 @@ enum L10n {
     static var tripsEmptyMessage: String { string("trips.empty.message") }
     static var tripsEmptyFilteredTitle: String { string("trips.empty.filtered.title") }
     static var tripsEmptyFilteredMessage: String { string("trips.empty.filtered.message") }
+    static var emptyTripsTitle: String { string("empty.trips.title") }
+    static var emptyTripsMessage: String { string("empty.trips.message") }
+    static var emptyTripsStepStart: String { string("empty.trips.step.start") }
+    static var emptyTripsStepDrive: String { string("empty.trips.step.drive") }
+    static var emptyTripsStepReview: String { string("empty.trips.step.review") }
+    static var emptyTripsAuto: String { string("empty.trips.auto") }
+    static var emptyTripsRecordingTitle: String { string("empty.trips.recording.title") }
+    static var emptyTripsRecordingMessage: String { string("empty.trips.recording.message") }
+    static var emptyJournalHighlightMap: String { string("empty.journal.highlight.map") }
+    static var emptyJournalHighlightTotals: String { string("empty.journal.highlight.totals") }
+    static var emptyJournalHighlightSuggest: String { string("empty.journal.highlight.suggest") }
+    static var emptyStatsTitle: String { string("empty.stats.title") }
+    static var emptyStatsMessage: String { string("empty.stats.message") }
+    static var emptyStatsHighlightWeek: String { string("empty.stats.highlight.week") }
+    static var emptyStatsHighlightSpeed: String { string("empty.stats.highlight.speed") }
+    static var emptyStatsHighlightFuel: String { string("empty.stats.highlight.fuel") }
+    static var emptyRecapTitle: String { string("empty.recap.title") }
+    static var emptyRecapMessage: String { string("empty.recap.message") }
+    static var emptyRecapHighlightAwards: String { string("empty.recap.highlight.awards") }
+    static var emptyRecapHighlightRoutes: String { string("empty.recap.highlight.routes") }
+    static var emptyVehicleHighlightAuto: String { string("empty.vehicle.highlight.auto") }
+    static var emptyVehicleHighlightCare: String { string("empty.vehicle.highlight.care") }
+    static var emptyVehicleHighlightCosts: String { string("empty.vehicle.highlight.costs") }
+    static var emptyGoTrips: String { string("empty.goTrips") }
     static var tripsSearchEmpty: String { string("trips.search.empty") }
     static var tripsMergeTitle: String { string("trips.merge.title") }
     static func tripsMergeMessage(_ count: Int) -> String {

@@ -90,6 +90,9 @@ struct TripListView: View {
     @State private var lastGroupedDay: Date?
     @State private var suggestionLoader: TravelSuggestionLoader?
     @State private var suggestionTask: Task<Void, Never>?
+    /// Visible size of the trips list and the travels pane. The empty showcase fills and centers in it.
+    @State private var tripListViewport: CGSize = .zero
+    @State private var travelsViewport: CGSize = .zero
     @State private var weekSummaryText = ""
     @State private var weekSummaryRefreshToken = 0
     @State private var isWeekSummaryRefreshing = false
@@ -388,8 +391,14 @@ struct TripListView: View {
     }
 
     @ViewBuilder
-    private func journalListContent(searchText: String, searchBusy: Bool) -> some View {
+    private func journalListContent(
+        searchText: String,
+        searchBusy: Bool,
+        viewport: CGSize,
+        sectionsAbove: Int
+    ) -> some View {
         let isSearching = TravelJournalPage.Filters(searchText: searchText).isActive
+        let showsSuggestion = travelSuggestion != nil && !isSearching
 
         if let suggestion = travelSuggestion, !isSearching {
             Section {
@@ -425,24 +434,42 @@ struct TripListView: View {
 
         if loadedJournals.isEmpty {
             if !searchBusy {
-                GlassEmptyState(
-                    title: isSearching ? L10n.journalEmptySearchTitle : L10n.journalEmptyTitle,
-                    systemImage: isSearching ? "magnifyingglass" : "map",
-                    message: isSearching ? L10n.journalEmptySearchMessage : L10n.journalEmptyMessage,
-                    bounceTrigger: isSearching
-                )
-                .glassListRow()
-                if !isSearching {
-                    Button {
-                        journalEditor = .create()
-                    } label: {
-                        Text(L10n.journalCreate)
-                            .font(.subheadline.weight(.semibold))
-                            .frame(maxWidth: .infinity)
-                    }
-                    .milehoundProminentButton()
-                    .tint(MilehoundBrandColors.brandBottom)
+                if isSearching {
+                    GlassEmptyState(
+                        title: L10n.journalEmptySearchTitle,
+                        systemImage: "magnifyingglass",
+                        message: L10n.journalEmptySearchMessage,
+                        bounceTrigger: isSearching
+                    )
                     .glassListRow()
+                } else {
+                    GlassShowcaseEmptyState(
+                        emblem: .symbol("suitcase.rolling.fill"),
+                        title: L10n.journalEmptyTitle,
+                        message: L10n.journalEmptyMessage,
+                        highlights: [
+                            GlassShowcaseHighlight(systemImage: "map.fill", title: L10n.emptyJournalHighlightMap),
+                            GlassShowcaseHighlight(systemImage: "sum", title: L10n.emptyJournalHighlightTotals),
+                            GlassShowcaseHighlight(systemImage: "sparkles", title: L10n.emptyJournalHighlightSuggest)
+                        ],
+                        available: EmptyLibraryPolicy.listShowcaseSize(
+                            viewport: viewport,
+                            sectionsAbove: sectionsAbove + (showsSuggestion ? 1 : 0)
+                        ),
+                        accessibilityIdentifier: "journal.empty"
+                    ) {
+                        Button {
+                            journalEditor = .create()
+                        } label: {
+                            Text(L10n.journalCreate)
+                                .font(.subheadline.weight(.semibold))
+                                .frame(maxWidth: .infinity)
+                        }
+                        .milehoundProminentButton()
+                        .tint(MilehoundBrandColors.brandBottom)
+                        .accessibilityIdentifier("journal.empty.create")
+                    }
+                    .showcaseListRow()
                 }
             }
         } else {
@@ -1106,8 +1133,14 @@ struct TripListView: View {
             )
             .listSectionSpacing(6)
 
-            journalListContent(searchText: journalDebouncedSearchText, searchBusy: false)
+            journalListContent(
+                searchText: journalDebouncedSearchText,
+                searchBusy: false,
+                viewport: travelsViewport,
+                sectionsAbove: 1
+            )
         }
+        .onGeometryChange(for: CGSize.self) { $0.size } action: { travelsViewport = $0 }
         .scrollDismissesKeyboard(.interactively)
         .dismissKeyboardOnTap(focus: $isJournalSearchFocused)
         .fieldKeyboardAccessory(
@@ -1428,25 +1461,33 @@ struct TripListView: View {
             }
 
             if mode == .travels {
-                journalListContent(searchText: debouncedSearchText, searchBusy: isSearchBusy)
-            } else if visibleTrips.isEmpty {
-                let showFilteredEmpty = hasActiveFilters && hasAnyTrips && !isSearchBusy
-                let showDefaultEmpty = !hasAnyTrips
-                    && !recordingService.state.isActiveSession
-                    && endCredits == nil
-                    && coldOpenTripID == nil
-                    && !isSearchBusy
-                if showFilteredEmpty || showDefaultEmpty {
+                journalListContent(
+                    searchText: debouncedSearchText,
+                    searchBusy: isSearchBusy,
+                    viewport: tripListViewport,
+                    sectionsAbove: tripListSectionsAbove(library: library, hasAnyTrips: hasAnyTrips)
+                )
+            } else if visibleTrips.isEmpty, didInitialLoad {
+                switch tripsEmptyKind(hasAnyTrips: hasAnyTrips) {
+                case .filtered:
                     GlassEmptyState(
-                        title: hasActiveFilters ? L10n.tripsEmptyFilteredTitle : L10n.tripsEmptyTitle,
+                        title: L10n.tripsEmptyFilteredTitle,
                         systemImage: "car",
-                        message: hasActiveFilters
-                            ? L10n.tripsEmptyFilteredMessage
-                            : L10n.tripsEmptyMessage,
+                        message: L10n.tripsEmptyFilteredMessage,
                         bounceTrigger: hasActiveFilters
                     )
                     .glassListRow()
                     .transition(MilehoundMotion.fadeScaleTransition(reduceMotion: reduceMotion))
+                case .firstRun:
+                    tripsFirstRunShowcase(
+                        sectionsAbove: tripListSectionsAbove(library: library, hasAnyTrips: hasAnyTrips)
+                    )
+                case .recordingFirstTrip:
+                    tripsRecordingShowcase(
+                        sectionsAbove: tripListSectionsAbove(library: library, hasAnyTrips: hasAnyTrips)
+                    )
+                case nil:
+                    EmptyView()
                 }
             } else {
                 ForEach(groups, id: \.section) { group in
@@ -1479,6 +1520,76 @@ struct TripListView: View {
         }
     }
 
+    private func tripsEmptyKind(hasAnyTrips: Bool) -> EmptyLibraryPolicy.TripsKind? {
+        EmptyLibraryPolicy.tripsKind(
+            hasAnyTrips: hasAnyTrips,
+            hasActiveFilters: hasActiveFilters,
+            isSearchBusy: isSearchBusy,
+            isRecording: recordingService.state.isActiveSession,
+            isRecordingTransition: endCredits != nil || coldOpenTripID != nil
+        )
+    }
+
+    /// Sections the list draws above the empty state. The recording card in the list is tall.
+    private func tripListSectionsAbove(library: TripsTabListMode?, hasAnyTrips: Bool) -> Int {
+        var count = 0
+        if library == .trips || hasAnyTrips || hasAnyJournals { count += 1 }
+        if showsVehicleSetupPrompt { count += 2 }
+        if careSummary.topBannerItem != nil { count += 1 }
+        if visibleOrphan != nil { count += 1 }
+        if recordingService.state.isActiveSession,
+           endCredits == nil,
+           recordingService.activeTripID != nil,
+           !layout.hidesRecordingCardFromList {
+            count += 3
+        }
+        return count
+    }
+
+    private func tripsFirstRunShowcase(sectionsAbove: Int) -> some View {
+        GlassShowcaseEmptyState(
+            emblem: .hound,
+            title: L10n.emptyTripsTitle,
+            message: L10n.emptyTripsMessage,
+            highlights: [
+                GlassShowcaseHighlight(systemImage: "play.fill", title: L10n.emptyTripsStepStart),
+                GlassShowcaseHighlight(systemImage: "steeringwheel", title: L10n.emptyTripsStepDrive),
+                GlassShowcaseHighlight(systemImage: "flag.checkered", title: L10n.emptyTripsStepReview)
+            ],
+            highlightsAreSteps: true,
+            available: EmptyLibraryPolicy.listShowcaseSize(viewport: tripListViewport, sectionsAbove: sectionsAbove),
+            accessibilityIdentifier: "trips.empty.firstRun"
+        ) {
+            // The setup prompt above already links the same guide.
+            if !showsVehicleSetupPrompt {
+                Button {
+                    tabSelection.openPairing()
+                } label: {
+                    Label(L10n.emptyTripsAuto, systemImage: "bolt.car")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity)
+                }
+                .milehoundGlassButton()
+                .accessibilityIdentifier("trips.empty.autoRecord")
+            }
+        }
+        .showcaseListRow()
+        .transition(MilehoundMotion.fadeScaleTransition(reduceMotion: reduceMotion))
+    }
+
+    /// Nothing to tap here: the driver may be moving.
+    private func tripsRecordingShowcase(sectionsAbove: Int) -> some View {
+        GlassShowcaseEmptyState(
+            emblem: .hound,
+            title: L10n.emptyTripsRecordingTitle,
+            message: L10n.emptyTripsRecordingMessage,
+            available: EmptyLibraryPolicy.listShowcaseSize(viewport: tripListViewport, sectionsAbove: sectionsAbove),
+            accessibilityIdentifier: "trips.empty.recording"
+        )
+        .showcaseListRow()
+        .transition(MilehoundMotion.fadeScaleTransition(reduceMotion: reduceMotion))
+    }
+
     private func tripListScrollChrome<Content: View>(
         mode: TripsTabListMode,
         paintsAtmosphere: Bool,
@@ -1496,6 +1607,7 @@ struct TripListView: View {
                 }
             )
             .glassListChrome(showsAtmosphere: paintsAtmosphere)
+            .onGeometryChange(for: CGSize.self) { $0.size } action: { tripListViewport = $0 }
             // Tighter than the global glass default so banner/search cards sit like date→trip gaps.
             .listSectionSpacing(6)
             .portraitPaneListWidth(layout.splitsTrips || layout.isWideBook)

@@ -30,6 +30,8 @@ struct StatsView: View {
     @State private var renderedSnapshotFingerprint: String?
     @State private var snapshotRefreshTask: Task<Void, Never>?
     @State private var earliestTripStart: Date?
+    @State private var hasCompletedTrip: Bool?
+    @State private var hasExpense: Bool?
     /// Bumped whenever the store reports a save, standing in for the change tracking a `@Query`
     /// would have given us.
     @State private var storeVersion = 0
@@ -204,7 +206,13 @@ struct StatsView: View {
     }
 
     private var statsChrome: some View {
-        statsList(currencyCode: settings.fuelCurrency.rawValue)
+        Group {
+            if showsInsightsShowcase {
+                statsShowcase
+            } else {
+                statsList(currencyCode: settings.fuelCurrency.rawValue)
+            }
+        }
             .animation(reduceMotion ? nil : MilehoundMotion.gentle, value: selectedPeriod)
             .animation(reduceMotion ? nil : MilehoundMotion.gentle, value: selectedCategoryID)
             .glassListChrome(showsAtmosphere: !layout.isPhoneBook)
@@ -722,6 +730,39 @@ struct StatsView: View {
         )
         descriptor.fetchLimit = 1
         earliestTripStart = (try? modelContext.fetch(descriptor))?.first?.startedAt
+        hasCompletedTrip = earliestTripStart != nil
+        hasExpense = ((try? modelContext.fetchCount(FetchDescriptor<VehicleExpense>())) ?? 0) > 0
+    }
+
+    private var showsInsightsShowcase: Bool {
+        EmptyLibraryPolicy.showsInsightsShowcase(hasCompletedTrip: hasCompletedTrip, hasExpense: hasExpense)
+    }
+
+    private var statsShowcase: some View {
+        GlassShowcasePane { size in
+            GlassShowcaseEmptyState(
+                emblem: .symbol("chart.bar.xaxis"),
+                title: L10n.emptyStatsTitle,
+                message: L10n.emptyStatsMessage,
+                highlights: [
+                    GlassShowcaseHighlight(systemImage: "calendar", title: L10n.emptyStatsHighlightWeek),
+                    GlassShowcaseHighlight(systemImage: "speedometer", title: L10n.emptyStatsHighlightSpeed),
+                    GlassShowcaseHighlight(systemImage: "fuelpump.fill", title: L10n.emptyStatsHighlightFuel)
+                ],
+                available: size,
+                accessibilityIdentifier: "stats.empty"
+            ) {
+                Button {
+                    tabSelection.openTrips()
+                } label: {
+                    Label(L10n.emptyGoTrips, systemImage: "car.fill")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity)
+                }
+                .milehoundGlassButton()
+                .accessibilityIdentifier("stats.empty.goTrips")
+            }
+        }
     }
 
     private func normalizeSelectedMonth() {

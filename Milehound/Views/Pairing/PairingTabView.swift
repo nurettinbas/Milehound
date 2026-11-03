@@ -19,6 +19,7 @@ struct PairingTabView: View {
     @State private var shortcutsGuideEntry: ShortcutsWizardEntry = .start
     @Environment(\.milehoundLayout) private var layout
     @State private var focusedVehicleID: UUID?
+    @State private var pairingListViewport: CGSize = .zero
 
     private var sortedVehicles: [VehicleProfile] {
         vehicles.sorted { lhs, rhs in
@@ -76,7 +77,20 @@ struct PairingTabView: View {
             .joined(separator: "|")
     }
 
+    @ViewBuilder
     private var vehicleFocus: some View {
+        if sortedVehicles.isEmpty {
+            GlassShowcasePane { size in
+                PairingEmptyState(available: size) {
+                    addFirstVehicle()
+                }
+            }
+        } else {
+            vehicleFocusCard
+        }
+    }
+
+    private var vehicleFocusCard: some View {
         let vehicle = sortedVehicles.first { $0.id == focusedVehicleID } ?? sortedVehicles.first
         return VStack(alignment: .leading, spacing: 8) {
             if let vehicle {
@@ -133,11 +147,19 @@ struct PairingTabView: View {
             }
 
             if sortedVehicles.isEmpty {
-                Section {
-                    PairingEmptyState {
-                        addFirstVehicle()
+                // The wide layouts center it in the focus pane instead.
+                if !layout.showsPairingVehicleFocus {
+                    Section {
+                        PairingEmptyState(
+                            available: EmptyLibraryPolicy.listShowcaseSize(
+                                viewport: pairingListViewport,
+                                sectionsAbove: locationService.authorizationState != .authorizedAlways ? 3 : 2
+                            )
+                        ) {
+                            addFirstVehicle()
+                        }
+                        .showcaseListRow()
                     }
-                    .glassListRow()
                 }
             } else {
                 Section(sortedVehicles.count == 1 ? L10n.pairingTabVehicleSection : L10n.pairingTabSavedVehicles) {
@@ -159,6 +181,7 @@ struct PairingTabView: View {
         }
         .listStyle(.insetGrouped)
         .glassListChrome(showsAtmosphere: paintsAtmosphere)
+        .onGeometryChange(for: CGSize.self) { $0.size } action: { pairingListViewport = $0 }
         .navigationTitle(L10n.string("vehicles.tab.title"))
         .navigationBarTitleDisplayMode(.inline)
         .milehoundShellToolbar()

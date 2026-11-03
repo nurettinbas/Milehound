@@ -1017,3 +1017,26 @@ final class JournalCornerCardUITests: MilehoundUITestCase {
         XCTAssertTrue(member.waitForNonExistence(timeout: uiTimeout))
     }
 }
+
+/// `-UITesting.emptyLibrary` launches with no trips, so each data page shows its showcase.
+final class MilehoundEmptyLibraryUITests: MilehoundUITestCase {
+    override var extraLaunchArguments: [String] { ["-UITesting.emptyLibrary"] }
+
+    func testEmptyLibraryShowcasesLeadBackToTrips() {
+        XCTAssertTrue(tripsTab.waitForExistence(timeout: uiTimeout))
+        let tripsEmpty = app.descendants(matching: .any)["trips.empty.firstRun"]
+        XCTAssertTrue(tripsEmpty.waitForExistence(timeout: uiTimeout), "Trips should show the first-run showcase")
+
+        statsTab.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["stats.empty"].waitForExistence(timeout: uiTimeout))
+        XCTAssertFalse(app.descendants(matching: .any)["stats.filters.card"].exists, "Empty Stats should not show the filter card")
+
+        yearTab.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["recap.empty"].waitForExistence(timeout: uiTimeout))
+        let goTrips = app.buttons["recap.empty.goTrips"]
+        XCTAssertTrue(goTrips.waitForExistence(timeout: uiTimeout))
+        goTrips.tap()
+
+        XCTAssertTrue(tripsEmpty.waitForExistence(timeout: uiTimeout), "Go to Trips should land on the Trips showcase")
+    }
+}

@@ -169,3 +169,50 @@ struct TripListViewModel {
         return isApplying || searchText != debouncedSearchText
     }
 }
+
+/// Which empty state a page shows before it has data.
+enum EmptyLibraryPolicy {
+    enum TripsKind: Equatable {
+        /// No completed trip yet and nothing recording.
+        case firstRun
+        /// The first trip is recording. Informational only: nothing to tap while driving.
+        case recordingFirstTrip
+        /// Trips exist, but none match the filters or search.
+        case filtered
+    }
+
+    static func tripsKind(
+        hasAnyTrips: Bool,
+        hasActiveFilters: Bool,
+        isSearchBusy: Bool,
+        isRecording: Bool,
+        isRecordingTransition: Bool
+    ) -> TripsKind? {
+        if isSearchBusy { return nil }
+        if hasAnyTrips { return hasActiveFilters ? .filtered : nil }
+        // Stop credits and the cold-open card own the list while they play.
+        if isRecordingTransition { return nil }
+        return isRecording ? .recordingFirstTrip : .firstRun
+    }
+
+    /// Share of the list viewport the showcase fills. Each section above it
+    /// (filters, banners, the recording card in the list) takes room first.
+    static func listHeightFraction(sectionsAbove: Int) -> CGFloat {
+        max(0.42, 0.86 - 0.14 * CGFloat(max(0, sectionsAbove)))
+    }
+
+    /// Room for the showcase in a list of the given viewport.
+    static func listShowcaseSize(viewport: CGSize, sectionsAbove: Int) -> CGSize? {
+        guard viewport.width > 1, viewport.height > 1 else { return nil }
+        return CGSize(
+            width: max(0, viewport.width - 2 * GlassTokens.panelHorizontalInset),
+            height: viewport.height * listHeightFraction(sectionsAbove: sectionsAbove)
+        )
+    }
+
+    /// Stats and Recap read trips and vehicle expenses. Either one is enough to show the page.
+    /// `nil` means not counted yet; the page keeps its normal body until both answers are in.
+    static func showsInsightsShowcase(hasCompletedTrip: Bool?, hasExpense: Bool?) -> Bool {
+        hasCompletedTrip == false && hasExpense == false
+    }
+}

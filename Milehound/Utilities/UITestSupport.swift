@@ -22,6 +22,15 @@ enum UITestSupport {
 
     static let smartCategorySeedTripID = UUID(uuidString: "aaaaaaaa-0000-4000-8000-0000000000ca")!
 
+    /// No sample trip: the empty-library showcases on Trips, Stats, and Recap.
+    static var seedsEmptyLibrary: Bool {
+        #if DEBUG
+        ProcessInfo.processInfo.arguments.contains("-UITesting.emptyLibrary")
+        #else
+        false
+        #endif
+    }
+
     /// Two finished trips plus a read "Trip ended" inbox row for the older one.
     static var seedsTripSwitch: Bool {
         #if DEBUG
@@ -151,7 +160,7 @@ enum UITestSupport {
             try? context.save()
             return
         }
-        if existing.isEmpty, !seedsSmartCategory {
+        if existing.isEmpty, !seedsSmartCategory, !seedsEmptyLibrary {
             let trip = PreviewData.sampleTrip
             context.insert(trip)
             for point in trip.points {

@@ -34,6 +34,8 @@ struct YearView: View {
 
     @State private var storeVersion = 0
     @State private var earliestTripStart: Date?
+    @State private var hasCompletedTrip: Bool?
+    @State private var hasExpense: Bool?
     @State private var forecastLoader: MonthCostForecastLoader?
     @State private var forecast: MonthCostForecast = .empty
     @State private var recapLoader: YearRecapSnapshotLoader?
@@ -63,7 +65,13 @@ struct YearView: View {
     )
 
     var body: some View {
-        yearList
+        Group {
+            if EmptyLibraryPolicy.showsInsightsShowcase(hasCompletedTrip: hasCompletedTrip, hasExpense: hasExpense) {
+                recapShowcase
+            } else {
+                yearList
+            }
+        }
             .glassListChrome()
             .navigationTitle(L10n.tabYear)
             .navigationBarTitleDisplayMode(.inline)
@@ -562,6 +570,38 @@ struct YearView: View {
         )
         descriptor.fetchLimit = 1
         earliestTripStart = (try? modelContext.fetch(descriptor))?.first?.startedAt
+        hasCompletedTrip = earliestTripStart != nil
+        hasExpense = ((try? modelContext.fetchCount(FetchDescriptor<VehicleExpense>())) ?? 0) > 0
+    }
+
+    private var recapShowcase: some View {
+        GlassShowcasePane { size in
+            GlassShowcaseEmptyState(
+                emblem: .symbol("trophy.fill"),
+                title: L10n.emptyRecapTitle,
+                message: L10n.emptyRecapMessage,
+                highlights: [
+                    GlassShowcaseHighlight(systemImage: "medal.fill", title: L10n.emptyRecapHighlightAwards),
+                    GlassShowcaseHighlight(systemImage: "seal.fill", title: L10n.string("premium.achievements.title")),
+                    GlassShowcaseHighlight(
+                        systemImage: "point.topleft.down.to.point.bottomright.curvepath.fill",
+                        title: L10n.emptyRecapHighlightRoutes
+                    )
+                ],
+                available: size,
+                accessibilityIdentifier: "recap.empty"
+            ) {
+                Button {
+                    tabSelection.openTrips()
+                } label: {
+                    Label(L10n.emptyGoTrips, systemImage: "car.fill")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity)
+                }
+                .milehoundGlassButton()
+                .accessibilityIdentifier("recap.empty.goTrips")
+            }
+        }
     }
 
     private func clampSelectedAwardsYear() {

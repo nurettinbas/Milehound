@@ -60,8 +60,35 @@ struct NotificationsListView: View {
             }
     }
 
+    private var showsEmptyInbox: Bool {
+        store.items.isEmpty && !recordingService.state.isActiveSession
+    }
+
+    /// Every layout: one showcase across the window, not an empty inbox beside an empty preview.
+    private var emptyInbox: some View {
+        GlassShowcasePane { size in
+            GlassShowcaseEmptyState(
+                emblem: .symbol("bell.fill"),
+                title: L10n.notificationsEmptyTitle,
+                message: L10n.notificationsEmptyMessage,
+                available: size,
+                accessibilityIdentifier: "notifications.empty"
+            )
+        }
+        .glassListChrome()
+    }
+
     @ViewBuilder
     private var inboxRoot: some View {
+        if showsEmptyInbox {
+            emptyInbox
+        } else {
+            populatedInboxRoot
+        }
+    }
+
+    @ViewBuilder
+    private var populatedInboxRoot: some View {
         switch layout.layoutClass {
         case .phone:
             inboxList()
@@ -210,14 +237,8 @@ struct NotificationsListView: View {
     @ViewBuilder
     private func inboxList(paintsAtmosphere: Bool = true) -> some View {
         Group {
-            if store.items.isEmpty && !recordingService.state.isActiveSession {
-                GlassEmptyState(
-                    title: L10n.notificationsEmptyTitle,
-                    systemImage: "bell.slash",
-                    message: L10n.notificationsEmptyMessage
-                )
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .glassListChrome(showsAtmosphere: paintsAtmosphere)
+            if showsEmptyInbox {
+                emptyInbox
             } else {
                 List {
                     if recordingService.state.isActiveSession {

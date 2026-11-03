@@ -1,24 +1,22 @@
 import SwiftUI
 
 struct PairingEmptyState: View {
+    var available: CGSize?
     let onAddVehicle: () -> Void
 
     var body: some View {
-        VStack(spacing: 14) {
-            Image(systemName: "car.fill")
-                .font(.title2)
-                .glassAccentForeground()
-                .symbolRenderingMode(.hierarchical)
-
-            VStack(spacing: 4) {
-                Text(L10n.pairingTabEmptyTitle)
-                    .font(.headline)
-                Text(L10n.pairingTabEmptyMessage)
-                    .font(.caption)
-                    .glassSecondaryInk()
-                    .multilineTextAlignment(.center)
-            }
-
+        GlassShowcaseEmptyState(
+            emblem: .symbol("car.side.fill"),
+            title: L10n.pairingTabEmptyTitle,
+            message: L10n.pairingTabEmptyMessage,
+            highlights: [
+                GlassShowcaseHighlight(systemImage: "bolt.car", title: L10n.emptyVehicleHighlightAuto),
+                GlassShowcaseHighlight(systemImage: "wrench.and.screwdriver.fill", title: L10n.emptyVehicleHighlightCare),
+                GlassShowcaseHighlight(systemImage: "creditcard.fill", title: L10n.emptyVehicleHighlightCosts)
+            ],
+            available: available,
+            accessibilityIdentifier: "pairing.empty"
+        ) {
             Button(action: onAddVehicle) {
                 Label(L10n.pairingTabDefineVehicle, systemImage: "plus.circle.fill")
                     .font(.subheadline.weight(.semibold))
@@ -28,7 +26,5 @@ struct PairingEmptyState: View {
             .milehoundProminentButton()
             .tint(MilehoundBrandColors.brandBottom)
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 8)
     }
 }
