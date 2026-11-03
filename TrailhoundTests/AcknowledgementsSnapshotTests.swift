@@ -18,7 +18,7 @@ final class AcknowledgementsSnapshotTests: XCTestCase {
         for (schemeName, scheme) in Self.schemes {
             assertSnapshot(
                 of: host(scheme: scheme),
-                as: .image(precision: 0.98, perceptualPrecision: 0.98, size: Self.size),
+                as: .shellImage(size: Self.size),
                 named: schemeName
             )
         }

@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		CD7D102CB0CE46ADBAF2039F /* AcknowledgementsSnapshotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC9CA9E4AEC8441CBDC9DBD5 /* AcknowledgementsSnapshotTests.swift */; };
+		24C5FEE1168B472BB0D87FAE /* ShellSnapshotImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = F783575B39D84B73B0920E09 /* ShellSnapshotImage.swift */; };
 		3A68FDE53B8D4EA3BD2CDCC3 /* CoreUtilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4E146B613FD47728BE9AF8D /* CoreUtilityTests.swift */; };
 		68C35986833540E4B3AF1F2F /* SchemaAndRoutesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88472E82FFB347DDA204203A /* SchemaAndRoutesTests.swift */; };
 		ABBF9882FB9D4B4DBBE280C2 /* TravelJournalMembershipTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D870EA14F08A4F8E86191CAF /* TravelJournalMembershipTests.swift */; };
@@ -500,6 +501,7 @@
 
 /* Begin PBXFileReference section */
 		EC9CA9E4AEC8441CBDC9DBD5 /* AcknowledgementsSnapshotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrailhoundTests/AcknowledgementsSnapshotTests.swift; sourceTree = SOURCE_ROOT; };
+		F783575B39D84B73B0920E09 /* ShellSnapshotImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrailhoundTests/ShellSnapshotImage.swift; sourceTree = SOURCE_ROOT; };
 		C4E146B613FD47728BE9AF8D /* CoreUtilityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrailhoundTests/Core/CoreUtilityTests.swift; sourceTree = SOURCE_ROOT; };
 		88472E82FFB347DDA204203A /* SchemaAndRoutesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrailhoundTests/Data/SchemaAndRoutesTests.swift; sourceTree = SOURCE_ROOT; };
 		D870EA14F08A4F8E86191CAF /* TravelJournalMembershipTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrailhoundTests/Data/TravelJournalMembershipTests.swift; sourceTree = SOURCE_ROOT; };
@@ -1468,6 +1470,7 @@
 			isa = PBXGroup;
 			children = (
 				EC9CA9E4AEC8441CBDC9DBD5 /* AcknowledgementsSnapshotTests.swift */,
+				F783575B39D84B73B0920E09 /* ShellSnapshotImage.swift */,
 				C4E146B613FD47728BE9AF8D /* CoreUtilityTests.swift */,
 				88472E82FFB347DDA204203A /* SchemaAndRoutesTests.swift */,
 				D870EA14F08A4F8E86191CAF /* TravelJournalMembershipTests.swift */,
@@ -1760,6 +1763,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				CD7D102CB0CE46ADBAF2039F /* AcknowledgementsSnapshotTests.swift in Sources */,
+				24C5FEE1168B472BB0D87FAE /* ShellSnapshotImage.swift in Sources */,
 				3A68FDE53B8D4EA3BD2CDCC3 /* CoreUtilityTests.swift in Sources */,
 				68C35986833540E4B3AF1F2F /* SchemaAndRoutesTests.swift in Sources */,
 				ABBF9882FB9D4B4DBBE280C2 /* TravelJournalMembershipTests.swift in Sources */,

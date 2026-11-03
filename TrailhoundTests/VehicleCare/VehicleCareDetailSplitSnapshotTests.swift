@@ -53,7 +53,7 @@ final class VehicleCareDetailSplitSnapshotTests: XCTestCase {
                     controller.view.backgroundColor = scheme.1 == .dark ? .black : .white
                     assertSnapshot(
                         of: controller,
-                        as: .image(precision: 0.98, perceptualPrecision: 0.98, size: size.1),
+                        as: .shellImage(size: size.1),
                         named: "\(size.0)-\(scheme.0)"
                     )
                 }

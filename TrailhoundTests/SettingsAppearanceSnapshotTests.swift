@@ -45,7 +45,7 @@ final class SettingsAppearanceSnapshotTests: XCTestCase {
                 AppSettings.shared.appearanceMode = scheme == .dark ? .dark : .light
                 assertSnapshot(
                     of: host(dayNightRow, scheme: scheme, size: Self.switchRow),
-                    as: .image(precision: 0.98, perceptualPrecision: 0.98, size: Self.switchRow),
+                    as: .shellImage(size: Self.switchRow),
                     named: schemeName
                 )
             }
@@ -57,7 +57,7 @@ final class SettingsAppearanceSnapshotTests: XCTestCase {
             for (schemeName, scheme) in Self.schemes {
                 assertSnapshot(
                     of: host(textSizePicker, scheme: scheme, size: Self.row),
-                    as: .image(precision: 0.98, perceptualPrecision: 0.98, size: Self.row),
+                    as: .shellImage(size: Self.row),
                     named: schemeName
                 )
             }
@@ -70,7 +70,7 @@ final class SettingsAppearanceSnapshotTests: XCTestCase {
                 AppSettings.shared.appearanceMode = scheme == .dark ? .dark : .light
                 assertSnapshot(
                     of: host(AppearanceSettingsView(), scheme: scheme, size: Self.page),
-                    as: .image(precision: 0.98, perceptualPrecision: 0.98, size: Self.page),
+                    as: .shellImage(size: Self.page),
                     named: schemeName
                 )
             }
@@ -81,7 +81,7 @@ final class SettingsAppearanceSnapshotTests: XCTestCase {
                     scheme: .light,
                     size: Self.page
                 ),
-                as: .image(precision: 0.98, perceptualPrecision: 0.98, size: Self.page),
+                as: .shellImage(size: Self.page),
                 named: "largeType-light"
             )
         }
@@ -93,14 +93,14 @@ final class SettingsAppearanceSnapshotTests: XCTestCase {
             for (schemeName, scheme) in Self.schemes {
                 assertSnapshot(
                     of: host(LanguageSettingsView(), scheme: scheme, size: CGSize(width: 390, height: 420)),
-                    as: .image(precision: 0.98, perceptualPrecision: 0.98, size: CGSize(width: 390, height: 420)),
+                    as: .shellImage(size: CGSize(width: 390, height: 420)),
                     named: "en-\(schemeName)"
                 )
             }
             AppLanguageStore.shared.select(.tr)
             assertSnapshot(
                 of: host(LanguageSettingsView(), scheme: .light, size: CGSize(width: 390, height: 420)),
-                as: .image(precision: 0.98, perceptualPrecision: 0.98, size: CGSize(width: 390, height: 420)),
+                as: .shellImage(size: CGSize(width: 390, height: 420)),
                 named: "tr-light"
             )
         }
