@@ -49,6 +49,23 @@ enum LiveFollowPresentation {
         return min(proportional, cap)
     }
 
+    /// Widths for the live-map row. Stats and Pause/Stop keep their own width;
+    /// the middle slot gets only the gap between them, so a landscape phone pane
+    /// cannot push either end off the map.
+    static func hudColumns(
+        availableWidth: CGFloat,
+        statsWidth: CGFloat,
+        controlsWidth: CGFloat,
+        spacing: CGFloat = 6
+    ) -> (stats: CGFloat, switches: CGFloat, controls: CGFloat) {
+        let available = max(0, availableWidth)
+        let stats = max(0, statsWidth)
+        let controls = max(0, controlsWidth)
+        let gap = max(0, spacing) * 2
+        let switches = max(0, available - stats - controls - gap)
+        return (stats, switches, controls)
+    }
+
     /// Settled bottom HUD frame inside `container` (same coordinate space).
     static func settledHUDRect(
         in container: CGRect,

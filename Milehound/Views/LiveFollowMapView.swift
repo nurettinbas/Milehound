@@ -1259,6 +1259,7 @@ struct LiveFollowRouteCard: View {
     @Environment(\.locale) private var locale
     @Environment(\.shellPalette) private var shellPalette
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Namespace private var morph
 
     private static let morphID = "liveMap.routeCard"
@@ -1307,47 +1308,192 @@ struct LiveFollowRouteCard: View {
         maneuver: UpcomingManeuver?
     ) -> some View {
         let showsBanner = missed || rerouting || maneuver != nil
-        return VStack(spacing: 0) {
-            HStack(spacing: 6 * heightScale) {
-                RecordingRouteChip(
-                    content: content,
-                    action: action,
-                    wide: true,
-                    embedded: true,
-                    heightScale: heightScale
-                )
-                .frame(maxWidth: .infinity)
-                Button {
-                    setCollapsed(true)
-                } label: {
-                    Image(systemName: "arrow.down.right.and.arrow.up.left")
-                        .font(.system(size: 11 * heightScale, weight: .bold))
-                        .foregroundStyle(Color.white)
-                        .frame(width: Self.collapseSide, height: Self.collapseSide)
-                        .background { MilehoundTintCapsule() }
-                        .contentShape(Circle())
-                }
-                .buttonStyle(.glassPlainHit)
-                .accessibilityLabel(L10n.string("recording.live_map.route.hide"))
-                .accessibilityIdentifier("liveMap.route.collapse")
+        return Group {
+            if case .estimate = content {
+                routeCard(content: content, showsBanner: showsBanner, missed: missed, rerouting: rerouting, maneuver: maneuver)
+            } else if showsBanner {
+                routeCard(content: content, showsBanner: true, missed: missed, rerouting: rerouting, maneuver: maneuver)
+            } else {
+                destinationCapsule(content: content)
             }
-            .padding(.horizontal, 8 * heightScale)
-            .padding(.top, 8 * heightScale)
-            .padding(.bottom, showsBanner ? 6 * heightScale : 8 * heightScale)
+        }
+    }
+
+    /// No route yet: one glass capsule. Nothing to collapse.
+    private func destinationCapsule(content: RecordingRouteChip.Content) -> some View {
+        Button {
+            MilehoundHaptics.selection()
+            action()
+        } label: {
+            HStack(spacing: 10) {
+                routeGlyph(content: content)
+                Text(capsuleTitle(content))
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(hudInk)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                Image(systemName: "chevron.forward")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(hudInk.opacity(0.55))
+                    .accessibilityHidden(true)
+            }
+            .padding(.leading, (GlassTokens.toolbarControlCircleSide - Self.glyphSide) / 2)
+            .padding(.trailing, 16)
+            .frame(height: GlassTokens.toolbarControlCircleSide)
+            .fixedSize()
+            .contentShape(Capsule())
+            .liveMapHUDPlate(Capsule(), interactive: true)
+        }
+        .buttonStyle(.glassPlainHit)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(capsuleTitle(content))
+        .accessibilityAddTraits(.isButton)
+        .accessibilityIdentifier("liveMap.destination")
+    }
+
+    /// Route set: minutes are the headline, distance and arrival the quiet second line.
+    private func routeCard(
+        content: RecordingRouteChip.Content,
+        showsBanner: Bool,
+        missed: Bool,
+        rerouting: Bool,
+        maneuver: UpcomingManeuver?
+    ) -> some View {
+        VStack(spacing: 0) {
+            Button {
+                MilehoundHaptics.selection()
+                action()
+            } label: {
+                HStack(spacing: Self.rowSpacing) {
+                    routeGlyph(content: content)
+                    routeHeadline(content: content)
+                    Spacer(minLength: 4)
+                    Image(systemName: "chevron.forward")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(hudInk.opacity(0.55))
+                        .accessibilityHidden(true)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.glassPlainHit)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(routeAccessibilityText(content))
+            .accessibilityHint(L10n.string("recording.live_map.destination.change"))
+            .accessibilityAddTraits(.isButton)
+            .accessibilityIdentifier(content == .setDestination ? "liveMap.destination" : "liveMap.eta")
+            .padding(.horizontal, Self.cardInset)
+            .padding(.top, Self.cardInset)
+            .padding(.bottom, showsBanner ? 10 : 2)
             if showsBanner {
                 Rectangle()
-                    .fill(Color.white.opacity(colorScheme == .dark ? 0.16 : 0.35))
+                    .fill(hudInk.opacity(0.14))
                     .frame(height: 0.5)
-                    .padding(.horizontal, 12)
+                    .padding(.horizontal, Self.cardInset)
                 banner(missed: missed, rerouting: rerouting, maneuver: maneuver)
-                    .padding(.horizontal, 10 * heightScale)
-                    .padding(.top, 6 * heightScale)
-                    .padding(.bottom, 8 * heightScale)
+                    .padding(.horizontal, Self.cardInset)
+                    .padding(.top, 8)
+                    .padding(.bottom, 2)
             }
+            Button {
+                setCollapsed(true)
+            } label: {
+                LiveMapGrabber()
+            }
+            .buttonStyle(.glassPlainHit)
+            .accessibilityLabel(L10n.string("recording.live_map.route.hide"))
+            .accessibilityIdentifier("liveMap.route.collapse")
         }
         .frame(maxWidth: .infinity)
         .clipShape(shape)
         .liveMapHUDPlate(shape)
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 12).onEnded { value in
+                let lift = -value.translation.height
+                guard lift > 24, lift > abs(value.translation.width) else { return }
+                setCollapsed(true)
+            }
+        )
+    }
+
+    /// The one accent on the card: a small theme disc. Everything else is HUD ink.
+    @ViewBuilder
+    private func routeGlyph(content: RecordingRouteChip.Content) -> some View {
+        ZStack {
+            MilehoundTintCapsule()
+            switch content {
+            case .loading:
+                ProgressView()
+                    .controlSize(.mini)
+                    .tint(Color.white)
+            default:
+                Image(systemName: glyphSymbol(content))
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Color.white)
+            }
+        }
+        .frame(width: Self.glyphSide, height: Self.glyphSide)
+        .accessibilityHidden(true)
+    }
+
+    @ViewBuilder
+    private func routeHeadline(content: RecordingRouteChip.Content) -> some View {
+        if case let .estimate(distance, countdown, arrival) = content {
+            VStack(alignment: .leading, spacing: 1) {
+                Text(countdown)
+                    .font(.system(size: 20, weight: .bold, design: .rounded))
+                    .foregroundStyle(hudInk)
+                    .monospacedDigit()
+                    .contentTransition(.numericText())
+                Text("\(distance) · ~\(arrival)")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(hudInk.opacity(0.62))
+                    .monospacedDigit()
+            }
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
+        } else {
+            Text(capsuleTitle(content))
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(hudInk)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        }
+    }
+
+    private func glyphSymbol(_ content: RecordingRouteChip.Content) -> String {
+        switch content {
+        case .setDestination: return "flag.fill"
+        case .offline: return "wifi.slash"
+        case .failed: return "exclamationmark.triangle.fill"
+        case .loading, .estimate: return "flag.checkered"
+        }
+    }
+
+    private func capsuleTitle(_ content: RecordingRouteChip.Content) -> String {
+        switch content {
+        case .setDestination: return L10n.string("recording.live_map.destination")
+        case .loading: return L10n.string("recording.live_map.route.loading")
+        case .offline: return L10n.string("recording.live_map.route.offline")
+        case .failed: return L10n.string("recording.live_map.route.failed")
+        case let .estimate(distance, countdown, arrival):
+            return "\(countdown) · \(distance) · ~\(arrival)"
+        }
+    }
+
+    private func routeAccessibilityText(_ content: RecordingRouteChip.Content) -> String {
+        if case let .estimate(distance, countdown, arrival) = content {
+            return String(
+                format: L10n.string("recording.live_map.route.eta.accessibility"),
+                distance,
+                countdown,
+                arrival
+            )
+        }
+        return capsuleTitle(content)
+    }
+
+    private var hudInk: Color {
+        LiveFollowHUDInk.primary(scheme: colorScheme, palette: shellPalette, reduceTransparency: reduceTransparency)
     }
 
     /// Same tint disc as the destination row, inside one HUD glass plate. The glyph is the card's state.
@@ -1380,9 +1526,9 @@ struct LiveFollowRouteCard: View {
                     disc
                     HStack(spacing: 0) {
                         Text(countdown)
-                            .foregroundStyle(RecordingRouteChip.countdownInk)
+                            .foregroundStyle(hudInk)
                         Text(" · \(distance)")
-                            .foregroundStyle(bannerInk)
+                            .foregroundStyle(hudInk.opacity(0.62))
                     }
                     .font(.system(size: 14, weight: .bold))
                     .monospacedDigit()
@@ -1429,8 +1575,10 @@ struct LiveFollowRouteCard: View {
         }
     }
 
-    private static let collapseSide: CGFloat = 30
     private static let collapsedDiscSide: CGFloat = 34
+    private static let glyphSide: CGFloat = 30
+    private static let rowSpacing: CGFloat = 10
+    private static let cardInset: CGFloat = 10
 
     /// The live map turns animations off; this flag lets the morph through.
     private func setCollapsed(_ collapsed: Bool) {
@@ -1489,22 +1637,25 @@ struct LiveFollowRouteCard: View {
         identifier: String,
         lineLimit: Int = 1
     ) -> some View {
-        HStack(alignment: .center, spacing: 6) {
-            if showsProgress {
-                ProgressView()
-                    .controlSize(.mini)
-            } else if let systemImage {
-                Image(systemName: systemImage)
-                    .font(.system(size: 12 * heightScale, weight: .semibold))
-                    .foregroundStyle(bannerInk)
+        HStack(alignment: .center, spacing: Self.rowSpacing) {
+            Group {
+                if showsProgress {
+                    ProgressView()
+                        .controlSize(.mini)
+                } else if let systemImage {
+                    Image(systemName: systemImage)
+                        .font(.system(size: 12 * heightScale, weight: .semibold))
+                        .foregroundStyle(bannerInk)
+                }
             }
+            .frame(width: Self.glyphSide)
             Text(title)
                 .font(.system(size: 11 * heightScale + 2, weight: .semibold))
                 .foregroundStyle(bannerInk)
-                .multilineTextAlignment(.center)
+                .multilineTextAlignment(.leading)
                 .lineLimit(lineLimit)
                 .minimumScaleFactor(0.85)
-                .frame(maxWidth: .infinity)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier(identifier)

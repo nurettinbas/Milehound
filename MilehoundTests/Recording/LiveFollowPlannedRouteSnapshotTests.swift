@@ -246,6 +246,8 @@ final class LiveFollowPlannedRouteSnapshotTests: XCTestCase {
                 typeSize: .accessibility3,
                 named: "open-ax3"
             )
+            assertRouteCard(store: empty, collapsed: false, size: circle, scheme: .light, named: "capsule-light")
+            assertRouteCard(store: empty, collapsed: false, size: circle, scheme: .dark, named: "capsule-dark")
             assertRouteCard(store: empty, collapsed: true, size: circle, scheme: .light, named: "circle-light")
             assertRouteCard(store: empty, collapsed: true, size: circle, scheme: .dark, named: "circle-dark")
         }

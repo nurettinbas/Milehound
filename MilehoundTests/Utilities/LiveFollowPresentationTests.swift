@@ -34,6 +34,25 @@ final class LiveFollowPresentationTests: XCTestCase {
         )
     }
 
+    func testHUDColumnsStayInsideALandscapePane() {
+        let pane = LiveFollowPresentation.hudColumns(
+            availableWidth: 360,
+            statsWidth: 86,
+            controlsWidth: 78
+        )
+        XCTAssertEqual(pane.stats, 86, accuracy: 0.01)
+        XCTAssertEqual(pane.controls, 78, accuracy: 0.01)
+        XCTAssertEqual(pane.switches, 360 - 86 - 78 - 12, accuracy: 0.01)
+        XCTAssertLessThanOrEqual(pane.stats + pane.switches + pane.controls + 12, 360)
+
+        let cramped = LiveFollowPresentation.hudColumns(
+            availableWidth: 140,
+            statsWidth: 86,
+            controlsWidth: 78
+        )
+        XCTAssertEqual(cramped.switches, 0, accuracy: 0.01)
+    }
+
     func testHUDColumnWidthCapsTheCoverAndThePane() {
         XCTAssertEqual(
             LiveFollowPresentation.hudColumnWidth(containerWidth: 390, landscapeCover: false, fillsPane: false),

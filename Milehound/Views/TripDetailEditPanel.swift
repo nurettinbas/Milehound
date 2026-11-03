@@ -275,6 +275,7 @@ struct TripDetailEditPanel: View {
                     }
                     .scrollBounceBehavior(.basedOnSize)
                     .modifier(FullPageVerticalBleed(enabled: !showsGrabber))
+                    .contentMargins(.bottom, 0, for: .scrollIndicators)
                     .dismissKeyboardOnScroll()
                     .onChange(of: focusedField) { _, field in
                         scrollToFocusedField(field, proxy: proxy)
@@ -384,7 +385,9 @@ struct TripDetailEditPanel: View {
         trimTailCount = 0
     }
 
-    /// Full-page panes already sit on the book. The scroll view must not re-inset the status and home bands.
+    /// The phone sheet already reaches the screen bottom, under the tab bar.
+    /// A second safe-area inset leaves a gap, so the scroll stops short of that edge.
+    /// Full-page panes also skip the status band.
     private struct FullPageVerticalBleed: ViewModifier {
         var enabled: Bool
 
@@ -392,7 +395,7 @@ struct TripDetailEditPanel: View {
             if enabled {
                 content.ignoresSafeArea(edges: .vertical)
             } else {
-                content
+                content.ignoresSafeArea(edges: .bottom)
             }
         }
     }

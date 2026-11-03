@@ -362,6 +362,30 @@ private extension View {
     }
 }
 
+/// Sheet-style handle at the foot of a live-map plate. The whole strip is the
+/// hit area; the bar itself stays a quiet 36×4 in HUD ink.
+struct LiveMapGrabber: View {
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.shellPalette) private var shellPalette
+
+    var body: some View {
+        Capsule(style: .continuous)
+            .fill(
+                LiveFollowHUDInk.primary(
+                    scheme: colorScheme,
+                    palette: shellPalette,
+                    reduceTransparency: reduceTransparency
+                )
+                .opacity(0.32)
+            )
+            .frame(width: 36, height: 4)
+            .frame(maxWidth: .infinity)
+            .frame(height: 22)
+            .contentShape(Rectangle())
+    }
+}
+
 private struct RecordingSegmentTrackModifier: ViewModifier {
     var height: CGFloat = 28
     var inset: CGFloat = 2
@@ -497,6 +521,65 @@ private struct LiveFollowRouteCardWidthLayout: Layout {
     }
 }
 
+/// Stats at the leading edge, Pause and Stop at the trailing edge, the middle slot
+/// takes the gap between them. The row is never wider than it is offered.
+private struct LiveFollowHUDRow: Layout {
+    var spacing: CGFloat = 6
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let measured = measure(proposal: proposal, subviews: subviews)
+        let height = measured.height
+        if let offered = proposal.width {
+            return CGSize(width: offered, height: height)
+        }
+        return CGSize(width: measured.stats + measured.switches + measured.controls + spacing * 2, height: height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        guard subviews.count >= 3 else { return }
+        let measured = measure(proposal: ProposedViewSize(width: bounds.width, height: proposal.height), subviews: subviews)
+        let statsSize = subviews[0].sizeThatFits(ProposedViewSize(width: measured.stats, height: nil))
+        let controlsSize = subviews[2].sizeThatFits(ProposedViewSize(width: measured.controls, height: nil))
+        let switchSize = subviews[1].sizeThatFits(ProposedViewSize(width: measured.switches, height: nil))
+        subviews[0].place(
+            at: CGPoint(x: bounds.minX, y: bounds.maxY),
+            anchor: .bottomLeading,
+            proposal: ProposedViewSize(width: statsSize.width, height: statsSize.height)
+        )
+        subviews[2].place(
+            at: CGPoint(x: bounds.maxX, y: bounds.maxY),
+            anchor: .bottomTrailing,
+            proposal: ProposedViewSize(width: controlsSize.width, height: controlsSize.height)
+        )
+        let gapMin = bounds.minX + statsSize.width + spacing
+        let gapMax = bounds.maxX - controlsSize.width - spacing
+        let gap = max(0, gapMax - gapMin)
+        let switchX = gapMin + max(0, (gap - measured.switches) / 2)
+        subviews[1].place(
+            at: CGPoint(x: switchX, y: bounds.maxY),
+            anchor: .bottomLeading,
+            proposal: ProposedViewSize(width: measured.switches, height: switchSize.height)
+        )
+    }
+
+    private func measure(proposal: ProposedViewSize, subviews: Subviews) -> (stats: CGFloat, switches: CGFloat, controls: CGFloat, height: CGFloat) {
+        guard subviews.count >= 3 else { return (0, 0, 0, 0) }
+        let stats = subviews[0].sizeThatFits(.unspecified)
+        let controls = subviews[2].sizeThatFits(.unspecified)
+        let available = proposal.width
+            ?? (stats.width + subviews[1].sizeThatFits(.unspecified).width + controls.width + spacing * 2)
+        let columns = LiveFollowPresentation.hudColumns(
+            availableWidth: available,
+            statsWidth: stats.width,
+            controlsWidth: controls.width,
+            spacing: spacing
+        )
+        let switches = subviews[1].sizeThatFits(ProposedViewSize(width: columns.switches, height: proposal.height))
+        let height = max(stats.height, switches.height, controls.height)
+        return (columns.stats, columns.switches, columns.controls, height)
+    }
+}
+
 struct LiveFollowHUDSample: Equatable {
     var duration: String
     var speed: String
@@ -525,7 +608,7 @@ struct LiveFollowHUD<Route: View>: View {
     @Environment(\.shellPalette) private var shellPalette
 
     var body: some View {
-        HStack(alignment: .bottom, spacing: 6) {
+        LiveFollowHUDRow {
             statStack
                 .fixedSize(horizontal: true, vertical: true)
             VStack(spacing: 6) {
@@ -533,12 +616,10 @@ struct LiveFollowHUD<Route: View>: View {
                 route()
             }
             .modifier(LiveFollowRouteCardWidth(fraction: 0.85))
-            .frame(minWidth: 0, maxWidth: .infinity)
             controlColumn
                 .padding(.bottom, trailingColumnLift)
                 .fixedSize(horizontal: true, vertical: true)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
         .glassEffectGrouping(spacing: 0)
     }
 

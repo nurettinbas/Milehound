@@ -965,7 +965,7 @@ struct TripListView: View {
                 if let openTrip {
                     recordingPaneTripDetail(openTrip)
                 } else {
-                    tripList(scrollProxy: scrollProxy)
+                    tripList(scrollProxy: scrollProxy, paintsAtmosphere: false)
                 }
             }
         } else {
@@ -973,7 +973,7 @@ struct TripListView: View {
                 if let openTrip {
                     recordingPaneTripDetail(openTrip)
                 } else {
-                    tripList(scrollProxy: scrollProxy)
+                    tripList(scrollProxy: scrollProxy, paintsAtmosphere: false)
                 }
             } focus: {
                 if live {
