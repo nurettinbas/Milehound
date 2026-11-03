@@ -85,6 +85,21 @@ struct MilehoundLayoutSnapshot: Equatable, Sendable {
             && size.width < MilehoundLayoutResolver.openFoldSpan
     }
 
+    /// Phone book and every full-size iPad hide the tab bar while the live map is up.
+    /// On the book the bar crosses the map; on iPad it sits at the top and covers the route.
+    /// Closing the map brings the bar back. A narrow iPad window is `phone` and keeps the bar.
+    func hidesTabBarWhileLiveMap(showingLiveMap: Bool, recording: Bool, ending: Bool) -> Bool {
+        guard showingLiveMap, recording, !ending else { return false }
+        return isPhoneBook || layoutClass == .pad
+    }
+
+    /// The live map draws Back and Destination in the title band. A visible navigation bar
+    /// is clear, so the controls show through it, and it takes the taps. The wide book and
+    /// every full-size iPad hide that bar while the map is open.
+    var hidesNavigationBarForLiveMap: Bool {
+        isWideBook || layoutClass == .pad
+    }
+
     var splitsTrips: Bool {
         switch layoutClass {
         case .phone:
@@ -432,14 +447,14 @@ enum MilehoundLayoutResolver {
         return fraction
     }
 
-    /// Settings leading share. iPad portrait is 30/70. Landscape iPad stays on the window midpoint.
+    /// Settings leading share. iPad is 30/70 in both orientations.
     static func settingsLeadingFraction(
         isPhoneBook: Bool,
         layoutClass: MilehoundLayoutClass,
         isLandscape: Bool,
         hingeFullyOpen: Bool
     ) -> CGFloat? {
-        if layoutClass == .pad, !isLandscape {
+        if layoutClass == .pad {
             return flatPadPortraitSettingsLeadingFraction
         }
         return flatBookLeadingFraction(

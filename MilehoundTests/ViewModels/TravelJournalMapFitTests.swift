@@ -103,6 +103,36 @@ final class TravelJournalMapFitTests: XCTestCase {
         XCTAssertEqual(trailing.bottom, leading.bottom, accuracy: 0.5)
         XCTAssertGreaterThan(trailing.bottom, 140)
     }
+
+    func testIPadCornerCardIsNarrowerThanThePageAndShorterWhenOpen() {
+        let page = CGSize(width: 1180, height: 820)
+        let compact: CGFloat = 160
+        let bottom: CGFloat = 20
+        let openSpan = page.height - 80
+        let landscape = TravelJournalPadCardMetrics.expandedHeight(
+            pageHeight: page.height,
+            openSpan: openSpan,
+            compact: compact,
+            landscape: true,
+            bottomInset: bottom
+        )
+        let portrait = TravelJournalPadCardMetrics.expandedHeight(
+            pageHeight: page.width,
+            openSpan: page.width - 80,
+            compact: compact,
+            landscape: false,
+            bottomInset: bottom
+        )
+        XCTAssertEqual(
+            TravelJournalPadCardMetrics.width(screenWidth: page.width),
+            page.width * 0.44,
+            accuracy: 0.5
+        )
+        XCTAssertEqual(landscape, page.height / 2 - bottom, accuracy: 0.5)
+        XCTAssertEqual(portrait, (page.width - 80) * 0.48, accuracy: 0.5)
+        XCTAssertLessThan(landscape, page.height / 2)
+        XCTAssertGreaterThan(landscape, compact)
+    }
 }
 
 private extension MilehoundLayoutSnapshot {

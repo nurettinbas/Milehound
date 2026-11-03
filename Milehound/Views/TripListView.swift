@@ -572,9 +572,12 @@ struct TripListView: View {
         return !isRecordingCardInViewport
     }
 
-    /// Live map on the wide book covers the title row. A recording keeps the row so the bell stays.
+    /// The live map draws Back and Destination where the title sits. The bar is clear, so
+    /// those controls show through it and the bar takes the taps. The wide book and iPad
+    /// hide the bar while the map is open; closing the map brings the title back.
     private var hidesWideBookNavigationBar: Bool {
-        layout.isWideBook && !isMergeMode && showLiveFollowMap
+        guard !isMergeMode, showLiveFollowMap else { return false }
+        return layout.hidesNavigationBarForLiveMap
     }
 
     /// The phone book is short. The Milehound title sits in the only free row above the card.
@@ -702,10 +705,15 @@ struct TripListView: View {
         }
     }
 
-    /// The phone book is short and the floating tab bar sits across the fold, on top of the
-    /// live map's recording card. Like Apple Maps, the map hides it; closing the map brings it back.
+    /// The phone book is short and the floating tab bar sits across the map. On iPad the
+    /// system tab bar sits at the top and covers the route. Like Apple Maps, the map hides
+    /// it; closing the map brings it back.
     private var hidesTabBarForLiveMap: Bool {
-        layout.isPhoneBook && showLiveFollowMap && recordingService.state.isActiveSession && endCredits == nil
+        layout.hidesTabBarWhileLiveMap(
+            showingLiveMap: showLiveFollowMap,
+            recording: recordingService.state.isActiveSession,
+            ending: endCredits != nil
+        )
     }
 
     private func tripListRoot(scrollProxy: ScrollViewProxy) -> some View {

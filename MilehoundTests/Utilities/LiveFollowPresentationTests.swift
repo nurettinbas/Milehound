@@ -181,6 +181,54 @@ final class LiveFollowPresentationTests: XCTestCase {
         XCTAssertGreaterThan(offset.y, 0)
     }
 
+    func testPuckViewIsReattachedOnlyAfterTheMapIsOnScreen() {
+        XCTAssertFalse(
+            LiveFollowPresentation.shouldReattachPuckView(
+                hasAnnotation: true,
+                hasView: false,
+                drawingSuspended: false,
+                mapOnScreen: true,
+                secondsSinceAttachRequest: 0.1
+            )
+        )
+        XCTAssertFalse(
+            LiveFollowPresentation.shouldReattachPuckView(
+                hasAnnotation: true,
+                hasView: false,
+                drawingSuspended: true,
+                mapOnScreen: true,
+                secondsSinceAttachRequest: 1
+            )
+        )
+        XCTAssertFalse(
+            LiveFollowPresentation.shouldReattachPuckView(
+                hasAnnotation: true,
+                hasView: false,
+                drawingSuspended: false,
+                mapOnScreen: false,
+                secondsSinceAttachRequest: 1
+            )
+        )
+        XCTAssertFalse(
+            LiveFollowPresentation.shouldReattachPuckView(
+                hasAnnotation: true,
+                hasView: true,
+                drawingSuspended: false,
+                mapOnScreen: true,
+                secondsSinceAttachRequest: 1
+            )
+        )
+        XCTAssertTrue(
+            LiveFollowPresentation.shouldReattachPuckView(
+                hasAnnotation: true,
+                hasView: false,
+                drawingSuspended: false,
+                mapOnScreen: true,
+                secondsSinceAttachRequest: 0.35
+            )
+        )
+    }
+
     func testPuckRotationIsIdentityWhenMapAlreadyFacesTravel() {
         XCTAssertEqual(
             LiveFollowPresentation.puckRotationRadians(

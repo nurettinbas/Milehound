@@ -183,6 +183,20 @@ enum LiveFollowPresentation {
         CGPoint(x: 0, y: puckAnnotationFrameHeight / 2 - puckCircleSize / 2)
     }
 
+    /// MapKit drops the puck view while the map is hidden under another tab. The trail
+    /// overlay is rebuilt from the session; the view is not, so the line moves alone.
+    /// Re-add only after the map is on screen and MapKit has had a beat to build the view.
+    static func shouldReattachPuckView(
+        hasAnnotation: Bool,
+        hasView: Bool,
+        drawingSuspended: Bool,
+        mapOnScreen: Bool,
+        secondsSinceAttachRequest: TimeInterval
+    ) -> Bool {
+        guard hasAnnotation, !hasView, !drawingSuspended, mapOnScreen else { return false }
+        return secondsSinceAttachRequest >= 0.35
+    }
+
     /// Artwork is drawn pointing screen-up. Rotate it by this many radians so the
     /// chevron's sharp tip (and the photo) face `travelHeading` on a map whose
     /// camera heading is `mapHeading`. Near zero while following on a straight; through a

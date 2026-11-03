@@ -16,6 +16,52 @@ final class MilehoundLayoutTests: XCTestCase {
         XCTAssertEqual(resolved, .phone)
     }
 
+    func testLiveMapHidesTheTabBarOnThePhoneBookAndEveryFullSizeiPad() {
+        let book = MilehoundLayoutResolver.snapshot(
+            horizontal: .compact,
+            vertical: .compact,
+            size: CGSize(width: 874, height: 402),
+            idiom: .phone
+        )
+        let padLandscape = MilehoundLayoutResolver.snapshot(
+            horizontal: .regular,
+            vertical: .regular,
+            size: CGSize(width: 1180, height: 820),
+            idiom: .pad
+        )
+        let padPortrait = MilehoundLayoutResolver.snapshot(
+            horizontal: .regular,
+            vertical: .regular,
+            size: CGSize(width: 820, height: 1180),
+            idiom: .pad
+        )
+        let phone = MilehoundLayoutResolver.snapshot(
+            horizontal: .compact,
+            vertical: .regular,
+            size: CGSize(width: 390, height: 844),
+            idiom: .phone
+        )
+        let duo = MilehoundLayoutResolver.snapshot(
+            horizontal: .regular,
+            vertical: .regular,
+            size: CGSize(width: 1180, height: 820),
+            idiom: .phone
+        )
+
+        XCTAssertTrue(book.hidesTabBarWhileLiveMap(showingLiveMap: true, recording: true, ending: false))
+        XCTAssertTrue(padLandscape.hidesTabBarWhileLiveMap(showingLiveMap: true, recording: true, ending: false))
+        XCTAssertTrue(padPortrait.hidesTabBarWhileLiveMap(showingLiveMap: true, recording: true, ending: false))
+        XCTAssertFalse(phone.hidesTabBarWhileLiveMap(showingLiveMap: true, recording: true, ending: false))
+        XCTAssertFalse(duo.hidesTabBarWhileLiveMap(showingLiveMap: true, recording: true, ending: false))
+        XCTAssertFalse(padLandscape.hidesTabBarWhileLiveMap(showingLiveMap: false, recording: true, ending: false))
+        XCTAssertFalse(padLandscape.hidesTabBarWhileLiveMap(showingLiveMap: true, recording: false, ending: false))
+        XCTAssertFalse(padLandscape.hidesTabBarWhileLiveMap(showingLiveMap: true, recording: true, ending: true))
+        XCTAssertTrue(book.hidesNavigationBarForLiveMap)
+        XCTAssertTrue(padLandscape.hidesNavigationBarForLiveMap)
+        XCTAssertTrue(padPortrait.hidesNavigationBarForLiveMap)
+        XCTAssertFalse(phone.hidesNavigationBarForLiveMap)
+    }
+
     func testPhoneLandscape() {
         let resolved = MilehoundLayoutResolver.resolve(
             horizontal: .compact,
@@ -593,13 +639,14 @@ final class MilehoundLayoutTests: XCTestCase {
             ),
             0.3
         )
-        XCTAssertNil(
+        XCTAssertEqual(
             MilehoundLayoutResolver.settingsLeadingFraction(
                 isPhoneBook: false,
                 layoutClass: .pad,
                 isLandscape: true,
                 hingeFullyOpen: false
-            )
+            ),
+            0.3
         )
     }
 

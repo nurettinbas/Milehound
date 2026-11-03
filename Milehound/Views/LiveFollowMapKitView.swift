@@ -643,6 +643,9 @@ struct LiveFollowMapKitView: UIViewRepresentable {
         private var lastFollowCameraPose: LiveFollowCamera.Pose?
         /// Another tab is selected. Pose ticks must not put the puck or the route back.
         private var drawingSuspended = false
+        /// When the puck annotation was last handed to MapKit. A missing view after this
+        /// delay means the tab change dropped it; the next tick puts it back.
+        private var puckAttachRequestedAt: CFTimeInterval = 0
 
         private var cameraWritesPaused: Bool {
             CACurrentMediaTime() < suppressCameraUntil
@@ -657,6 +660,12 @@ struct LiveFollowMapKitView: UIViewRepresentable {
             if jumped {
                 suppressCameraUntil = CACurrentMediaTime() + 0.75
                 lastFollowCameraPose = nil
+            }
+            if let mapView {
+                DispatchQueue.main.async { [weak self, weak mapView] in
+                    guard let self, let mapView else { return }
+                    self.reattachPuckViewIfNeeded(on: mapView)
+                }
             }
         }
 
@@ -770,6 +779,7 @@ struct LiveFollowMapKitView: UIViewRepresentable {
                     }
                     puck.headingDegrees = self.session.vehicleHeadingDegrees
                 }
+                self.reattachPuckViewIfNeeded(on: map)
                 if CACurrentMediaTime() >= self.cameraEaseUntil {
                     self.applyPuckHeading(
                         self.session.vehicleHeadingDegrees,
@@ -871,6 +881,7 @@ struct LiveFollowMapKitView: UIViewRepresentable {
             if resume {
                 syncRouteIfNeeded(on: map)
                 syncPlannedRouteIfNeeded(on: map)
+                puckAttachRequestedAt = 0
             }
         }
 
@@ -1563,6 +1574,7 @@ struct LiveFollowMapKitView: UIViewRepresentable {
                     view.apply(puckAnnotation)
                     view.applyTheme(plate: puckPlateColor, chevronColors: puckChevronColors)
                     applyPuckHeading(puckAnnotation.headingDegrees, on: map, animated: false)
+                    puckAttachRequestedAt = 0
                 }
             } else {
                 let annotation = LiveFollowPuckAnnotation(
@@ -1574,7 +1586,44 @@ struct LiveFollowMapKitView: UIViewRepresentable {
                 )
                 puckAnnotation = annotation
                 map.addAnnotation(annotation)
+                puckAttachRequestedAt = CACurrentMediaTime()
             }
+        }
+
+        /// The trail is an overlay and comes back with the session. The vehicle mark is an
+        /// annotation view, and MapKit drops that view while the map is hidden under another
+        /// tab. Putting the annotation back once the map is on screen brings the icon with the line.
+        func reattachPuckViewIfNeeded(on map: MKMapView) {
+            guard let puck = puckAnnotation else {
+                puckAttachRequestedAt = 0
+                return
+            }
+            if map.view(for: puck) != nil {
+                puckAttachRequestedAt = 0
+                return
+            }
+            let hostVisible = (map.superview?.alpha ?? 1) > 0.01
+            let mapOnScreen = map.window != nil
+                && !map.isHidden
+                && map.bounds.width > 1
+                && map.bounds.height > 1
+                && hostVisible
+            guard !drawingSuspended, mapOnScreen else { return }
+            if puckAttachRequestedAt == 0 {
+                puckAttachRequestedAt = CACurrentMediaTime()
+                return
+            }
+            let elapsed = CACurrentMediaTime() - puckAttachRequestedAt
+            guard LiveFollowPresentation.shouldReattachPuckView(
+                hasAnnotation: true,
+                hasView: false,
+                drawingSuspended: false,
+                mapOnScreen: true,
+                secondsSinceAttachRequest: elapsed
+            ) else { return }
+            puckAttachRequestedAt = CACurrentMediaTime()
+            map.removeAnnotation(puck)
+            map.addAnnotation(puck)
         }
 
         func applyPuckAlpha(_ alpha: CGFloat, animated: Bool, on map: MKMapView) {
@@ -1668,6 +1717,7 @@ struct LiveFollowMapKitView: UIViewRepresentable {
             for view in views where view is LiveFollowPuckAnnotationView {
                 view.alpha = desiredPuckAlpha
                 view.isHidden = false
+                puckAttachRequestedAt = 0
             }
             if let puckAnnotation {
                 applyPuckHeading(puckAnnotation.headingDegrees, on: mapView, animated: false)

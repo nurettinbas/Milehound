@@ -133,6 +133,31 @@ enum TravelJournalPanelLayout {
     }
 }
 
+/// iPad travel card in the bottom-trailing corner.
+enum TravelJournalPadCardMetrics {
+    /// Share of the screen width.
+    static let widthFraction: CGFloat = 0.44
+    /// Portrait open height, as a share of the space under the top chrome.
+    static let portraitOpenFraction: CGFloat = 0.48
+
+    static func width(screenWidth: CGFloat) -> CGFloat {
+        screenWidth * widthFraction
+    }
+
+    /// Landscape reaches the middle of the page. Portrait stays under half the open span.
+    static func expandedHeight(
+        pageHeight: CGFloat,
+        openSpan: CGFloat,
+        compact: CGFloat,
+        landscape: Bool,
+        bottomInset: CGFloat
+    ) -> CGFloat {
+        let raw = landscape
+            ? pageHeight / 2 - bottomInset
+            : openSpan * portraitOpenFraction
+        return max(compact + 1, raw)
+    }
+}
 /// Split landscape frames the route in the trailing pane. A bottom sheet still
 /// shortens the phone and the narrow landscape card.
 enum TravelJournalMapFit {
@@ -211,9 +236,10 @@ struct TravelJournalDetailView: View {
     @State private var mapRefitTask: Task<Void, Never>?
     @Environment(\.milehoundLayout) private var layout
     @Environment(\.layoutDirection) private var layoutDirection
-    @State private var journalPanelCollapsed = false
     @State private var cornerCardExpanded = false
     @State private var coverCardMeasuredHeight: CGFloat = 0
+    @State private var floatingCardMeasuredHeight: CGFloat = 0
+    @State private var floatingExpandedLimit: CGFloat = 0
     @State private var coverExpandedLimit: CGFloat = 0
     @State private var coverHeaderBottom: CGFloat?
 
@@ -286,16 +312,24 @@ struct TravelJournalDetailView: View {
             : L10n.string("journal.map.expand")
     }
 
+    /// iPad and the narrow landscape card grow and shrink from the grabber.
+    /// The corner control only covered that same motion.
+    private var showsMapExpandButton: Bool {
+        layout.tripDetailStyle != .floatingPanel
+    }
+
     @ToolbarContentBuilder
     private var mapExpandToolbar: some ToolbarContent {
-        ToolbarItem(placement: .topBarTrailing) {
-            GlassToolbarCircleButton(
-                systemName: mapExpandIconName,
-                action: toggleMapExpanded
-            )
-            .accessibilityLabel(mapExpandAccessibilityLabel)
+        if showsMapExpandButton {
+            ToolbarItem(placement: .topBarTrailing) {
+                GlassToolbarCircleButton(
+                    systemName: mapExpandIconName,
+                    action: toggleMapExpanded
+                )
+                .accessibilityLabel(mapExpandAccessibilityLabel)
+            }
+            .hideSharedToolbarBackgroundIfAvailable()
         }
-        .hideSharedToolbarBackgroundIfAvailable()
     }
 
     @ViewBuilder
@@ -326,32 +360,9 @@ struct TravelJournalDetailView: View {
         } else if layout.isClosedCoverLandscape {
             coverCornerMap(in: geometry)
         } else if layout.tripDetailStyle == .floatingPanel {
-            MilehoundMapCanvas(panelCollapsed: $journalPanelCollapsed) {
-                TravelJournalMapLayer(
-                    style: mapStyle,
-                    overlays: overlays,
-                    selectedSegments: selectedSegments,
-                    cameraBox: cameraBox
-                )
-            } panel: {
-                editPanel(height: geometry.size.height, mapPeek: mapPeek, containerHeight: geometry.size.height, embedded: true)
-            }
+            pullUpJournalSheet(in: geometry, cardWidth: GlassTokens.floatingPanelWidth)
         } else if layout.tripDetailStyle == .stacked {
-            VStack(spacing: 0) {
-                TravelJournalMapLayer(
-                    style: mapStyle,
-                    overlays: overlays,
-                    selectedSegments: selectedSegments,
-                    cameraBox: cameraBox
-                )
-                .frame(height: geometry.size.height * 0.55)
-                editPanel(
-                    height: geometry.size.height * 0.45,
-                    mapPeek: mapPeek,
-                    containerHeight: geometry.size.height,
-                    embedded: true
-                )
-            }
+            pullUpJournalSheet(in: geometry, cardWidth: nil)
         } else {
             ZStack(alignment: .bottom) {
                 TravelJournalMapLayer(
@@ -562,6 +573,149 @@ struct TravelJournalDetailView: View {
         }
         withAnimation(reduceMotion ? nil : MilehoundMotion.sheetRise) {
             cornerCardExpanded = next
+            dragTranslation = 0
+        }
+    }
+
+    /// iPad keeps the card in the bottom-trailing corner, 44% of the screen width.
+    /// Portrait opens to 48% of the screen height. Landscape opens until the card
+    /// top meets the middle of the page. A narrow landscape phone keeps the trailing width.
+    /// The card starts as the summary. Pulling the grabber up lists the trips.
+    private func pullUpJournalSheet(in geometry: GeometryProxy, cardWidth: CGFloat?) -> some View {
+        let anchorsTrailing = layoutDirection != .rightToLeft
+        let padCorner = layout.layoutClass == .pad
+        let bottomInset = max(geometry.safeAreaInsets.bottom, windowSafeInsets.bottom, 12)
+        let topLimit = max(geometry.safeAreaInsets.top, windowSafeInsets.top, 54) + 8
+        let compactCard = floatingCompactHeight
+        let openSpan = max(compactCard + 1, geometry.size.height - topLimit - bottomInset - 12)
+        let expandedHeight: CGFloat = if padCorner {
+            TravelJournalPadCardMetrics.expandedHeight(
+                pageHeight: geometry.size.height,
+                openSpan: openSpan,
+                compact: compactCard,
+                landscape: layout.isLandscape,
+                bottomInset: bottomInset
+            )
+        } else {
+            openSpan
+        }
+        let resolvedWidth = padCorner
+            ? TravelJournalPadCardMetrics.width(screenWidth: geometry.size.width)
+            : cardWidth
+        let dragging = abs(dragTranslation) > 0.5
+        let expanded = panelDetent == .expanded
+        let base = expanded ? expandedHeight : compactCard
+        let liveHeight = min(
+            max(base - dragTranslation, compactCard - TravelJournalPanelLayout.rubberBand),
+            expandedHeight + TravelJournalPanelLayout.rubberBand
+        )
+        let alignment: Alignment = resolvedWidth == nil
+            ? .bottom
+            : (anchorsTrailing ? .bottomTrailing : .bottomLeading)
+        let card = Group {
+            if let resolvedWidth {
+                floatingJournalCard
+                    .frame(width: resolvedWidth, height: max(liveHeight, 1), alignment: .top)
+            } else {
+                floatingJournalCard
+                    .frame(maxWidth: .infinity, alignment: .top)
+                    .frame(height: max(liveHeight, 1), alignment: .top)
+            }
+        }
+            .padding(.bottom, bottomInset)
+            .padding(.horizontal, resolvedWidth == nil ? 16 : 0)
+            .padding(.trailing, resolvedWidth != nil && anchorsTrailing ? 16 : 0)
+            .padding(.leading, resolvedWidth != nil && !anchorsTrailing ? 16 : 0)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: alignment)
+            .offset(y: panelRisen ? 0 : 28)
+            .opacity(panelVisible ? 1 : 0)
+            .animation(reduceMotion ? nil : MilehoundMotion.sheetRise, value: panelRisen)
+            .animation(reduceMotion || dragging ? nil : MilehoundMotion.sheetRise, value: panelDetent)
+            .allowsHitTesting(panelVisible)
+
+        return ZStack {
+            journalMap
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background { mapSizeReader }
+            card
+        }
+        .onAppear {
+            floatingExpandedLimit = expandedHeight
+            refreshMapChromeInsets(from: geometry)
+        }
+        .onChange(of: geometry.size) { _, _ in
+            floatingExpandedLimit = expandedHeight
+            refreshMapChromeInsets(from: geometry)
+            scheduleMapRefit(animated: false)
+        }
+        .onChange(of: expandedHeight) { _, height in
+            floatingExpandedLimit = height
+        }
+    }
+
+    private var floatingCompactHeight: CGFloat {
+        floatingCardMeasuredHeight > 0 ? floatingCardMeasuredHeight : 168
+    }
+
+    private var floatingJournalCard: some View {
+        let expanded = panelDetent == .expanded
+        let mode: TravelJournalCornerMode = expanded ? .expanded : .compact
+        return TravelJournalEditPanel(
+            journal: journal,
+            trips: members,
+            selectedTripID: selectedTripID,
+            places: places,
+            restHeight: 0,
+            isExpanded: expanded,
+            cornerMode: mode,
+            reduceMotion: reduceMotion,
+            onSelectTrip: { selectedTripID = $0 },
+            onOpenTrip: { TabSelection.shared.appendTrip($0) },
+            onRemoveTrip: removeFromJournal,
+            onEdit: { editorDraft = .edit(journal) },
+            onToggleExpanded: { togglePanelDetent() },
+            onGrabberDragChanged: { translation in
+                dragTranslation = translation
+            },
+            onGrabberDragEnded: { predicted in
+                snapFloatingCard(predictedTranslation: predicted)
+            },
+            onCornerSummaryHeight: noteFloatingCardHeight
+        )
+        .background {
+            AtmosphericBackground(style: .lightweight)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: GlassTokens.cardRadius, style: .continuous))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("journal.floatingCard")
+    }
+
+    private func noteFloatingCardHeight(_ height: CGFloat) {
+        guard panelDetent == .compact, height > 0 else { return }
+        guard abs(height - floatingCardMeasuredHeight) > 1 else { return }
+        floatingCardMeasuredHeight = height
+        scheduleMapRefit(delayMilliseconds: 80)
+    }
+
+    private func snapFloatingCard(predictedTranslation: CGFloat) {
+        let compact = floatingCompactHeight
+        let expanded = max(floatingExpandedLimit, compact + 1)
+        let base = panelDetent == .expanded ? expanded : compact
+        let projected = min(max(base - predictedTranslation, compact), expanded)
+        let mid = (compact + expanded) / 2
+        let next: TravelJournalPanelDetent
+        if predictedTranslation < -240 {
+            next = .expanded
+        } else if predictedTranslation > 240 {
+            next = .compact
+        } else {
+            next = projected >= mid ? .expanded : .compact
+        }
+        if next != panelDetent {
+            MilehoundHaptics.selection()
+        }
+        withAnimation(reduceMotion ? nil : MilehoundMotion.sheetRise) {
+            panelDetent = next
             dragTranslation = 0
         }
     }
@@ -901,16 +1055,46 @@ struct TravelJournalDetailView: View {
         return GlassTokens.TravelCornerCardMetrics.compactWidth(screenWidth: mapViewportSize.width)
     }
 
+    /// Trailing travel card. On iPad it is the bottom-corner card, 44% of the screen width.
+    private var floatingCardWidthForFit: CGFloat {
+        guard !isMapExpanded else { return 0 }
+        if layout.layoutClass == .pad,
+           layout.tripDetailStyle == .floatingPanel || layout.tripDetailStyle == .stacked {
+            return TravelJournalPadCardMetrics.width(screenWidth: mapViewportSize.width)
+        }
+        guard layout.tripDetailStyle == .floatingPanel else { return 0 }
+        return GlassTokens.floatingPanelWidth
+    }
+
+    private var floatingCardHeightForFit: CGFloat {
+        guard !isMapExpanded else { return 0 }
+        let padCorner = layout.layoutClass == .pad
+            && (layout.tripDetailStyle == .floatingPanel || layout.tripDetailStyle == .stacked)
+        guard padCorner || layout.tripDetailStyle == .floatingPanel else { return 0 }
+        if panelDetent == .expanded {
+            return max(floatingExpandedLimit, floatingCompactHeight)
+        }
+        return floatingCompactHeight
+    }
+
     private func applyFittedCamera(animated: Bool) {
-        let sheetHeight = TravelJournalPanelLayout.height(
-            for: panelDetent,
-            containerHeight: mapViewportSize.height,
-            mapPeek: mapTopChromePoints + 24,
-            compactFraction: duoCompactFraction,
-            compactFloor: duoCompactFloor,
-            expandedFraction: duoExpandedFraction
-        )
-        let coverWidth = coverCardWidthForFit
+        let pullUpHeight = panelDetent == .expanded
+            ? max(floatingExpandedLimit, floatingCompactHeight)
+            : floatingCompactHeight
+        let sheetHeight = layout.tripDetailStyle == .stacked
+            && layout.layoutClass != .pad
+            && !isMapExpanded
+            ? pullUpHeight
+            : TravelJournalPanelLayout.height(
+                for: panelDetent,
+                containerHeight: mapViewportSize.height,
+                mapPeek: mapTopChromePoints + 24,
+                compactFraction: duoCompactFraction,
+                compactFloor: duoCompactFloor,
+                expandedFraction: duoExpandedFraction
+            )
+        let coverWidth = coverCardWidthForFit > 0 ? coverCardWidthForFit : floatingCardWidthForFit
+        let coverHeight = coverCardHeightForFit > 0 ? coverCardHeightForFit : floatingCardHeightForFit
         let padding = TravelJournalMapFit.padding(
             style: layout.tripDetailStyle,
             mapExpanded: isMapExpanded,
@@ -921,7 +1105,7 @@ struct TravelJournalDetailView: View {
             trailingCover: mapTrailingInset,
             homeIndicator: mapHomeIndicator,
             coverCardWidth: coverWidth,
-            coverCardHeight: coverCardHeightForFit,
+            coverCardHeight: coverHeight,
             coverCardIsTrailing: layoutDirection != .rightToLeft
         )
         guard let region = TripDetailViewModel.regionFitting(
