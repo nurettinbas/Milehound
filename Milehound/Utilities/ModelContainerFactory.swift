@@ -15,8 +15,8 @@ enum ModelContainerFactory {
         return directory.appendingPathComponent(storeFileName)
     }
 
-    /// Older builds stored trips as `Trailhound.store` or `Carinho.store` in this same folder.
-    /// Rename once so an update keeps the trips. Never deletes a store that is already `Milehound.store`.
+    /// Older builds used the filenames in `legacyNames`. Rename once so an update keeps the trips.
+    /// Never deletes a store that is already `Milehound.store`.
     private static func adoptLegacyStoreIfNeeded(in directory: URL) {
         let modern = directory.appendingPathComponent(storeFileName)
         guard !FileManager.default.fileExists(atPath: modern.path) else { return }
