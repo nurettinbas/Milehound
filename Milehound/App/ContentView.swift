@@ -41,7 +41,7 @@ struct ContentView: View {
                     .animation(layoutChangeAnimation, value: layoutSnapshot.layoutClass)
             }
         }
-        .scaleEffect(contentSettleScale, anchor: .center)
+        .scaleEffect(launchIntroAppliedScale, anchor: .center)
         .allowsHitTesting(launchIntroSettled)
 
             if !launchIntroSettled {
@@ -133,6 +133,17 @@ struct ContentView: View {
         let rotation = MilehoundInterfaceRotation.shared
         if rotation.isRotating || rotation.suppressReflowAnimation { return nil }
         return MilehoundMotion.layoutReflow(reduceMotion: reduceMotion)
+    }
+
+    /// A scaled `TabView` lays its bar out again on every frame of the settle. Where iOS can
+    /// draw a side column (open Duo, iPad), that pass flips it to a bottom bar and back.
+    private var launchIntroAppliedScale: CGFloat {
+        switch layoutSnapshot.layoutClass {
+        case .duoOpen, .pad:
+            return 1
+        case .phone, .phoneLandscape:
+            return contentSettleScale
+        }
     }
 
     private var isRecordingSession: Bool {
@@ -409,7 +420,7 @@ struct ContentView: View {
             .allowsHitTesting(false)
         }
         .overlay(alignment: .topLeading) {
-            if let frame = duoStatusCapsuleFrame, tabRootClear {
+            if let frame = duoStatusCapsuleFrame, tabRootClear || sideColumnChrome.holdsSideColumnCapsule {
                 DuoSideStatusCapsule()
                     .id(colorScheme)
                     .frame(width: frame.width, height: frame.height, alignment: .top)

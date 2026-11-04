@@ -134,6 +134,7 @@ extension View {
 
 /// Bell, then the Trips action when that action is showing. One vertical Liquid Glass capsule.
 struct DuoSideStatusCapsule: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Bindable private var tabSelection = TabSelection.shared
     @Bindable private var chrome = SideColumnChromeState.shared
 
@@ -156,7 +157,8 @@ struct DuoSideStatusCapsule: View {
                     GlassToolbarSymbol(systemName: "chevron.backward")
                 }
                 .accessibilityLabel(Text("onboarding.back"))
-                .accessibilityIdentifier("settings.places.back")
+                .accessibilityIdentifier("settings.detail.back")
+                .transition(.opacity.combined(with: .scale(scale: 0.6, anchor: .top)))
             }
             if showsSplitPair {
                 splitAction(systemName: "plus", label: L10n.journalNew, identifier: SideColumnChromeID.newJournal) {
@@ -178,7 +180,14 @@ struct DuoSideStatusCapsule: View {
         }
         .buttonStyle(.glassPlainHit)
         .glassCapsuleChrome()
+        .animation(backAnimation, value: chrome.showsSettingsDetailBack)
         .accessibilityElement(children: .contain)
+    }
+
+    /// The window overlay turns animation off so a rotation cannot slide the capsule.
+    /// Only the back row growing and shrinking animates.
+    private var backAnimation: Animation {
+        reduceMotion ? .easeOut(duration: 0.12) : MilehoundMotion.snappy
     }
 
     private var tripsTrailingIdentifier: String {

@@ -34,6 +34,7 @@ struct AppearanceSettingsView: View {
         }
         .navigationTitle(L10n.settingsAppearanceSection)
         .navigationBarTitleDisplayMode(.inline)
+        .sideColumnDetailBack()
         .glassListChrome()
     }
 }

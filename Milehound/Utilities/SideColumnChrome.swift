@@ -154,9 +154,19 @@ final class SideColumnChromeState {
     private(set) var isTransitioning = false
     /// False while a cover hides the tab root. The overlay is off, so the toolbar keeps the pair.
     private(set) var rootClear = true
-    /// Places and categories on the Duo side column. Back sits under the bell instead of beside it.
+    /// Pushed Settings pages on the Duo side column. Back sits under the bell instead of beside it.
     private(set) var showsSettingsDetailBack = false
     private var settingsDetailBackAction: (@MainActor () -> Void)?
+    /// The page that owns the back. A push can show the next page before the old one disappears.
+    private var settingsDetailBackOwner: UUID?
+    /// Back was tapped and the page is sliding away. The root probe can still read "covered"
+    /// for a frame, so the capsule stays up until the root reads clear.
+    private var poppingSettingsDetailOwner: UUID?
+
+    /// The window overlay keeps the capsule while a Settings page owns the back or is popping.
+    var holdsSideColumnCapsule: Bool {
+        showsSettingsDetailBack || poppingSettingsDetailOwner != nil
+    }
     private(set) var windowSize: CGSize = .zero
     private(set) var safeInsets: UIEdgeInsets = .zero
     private(set) var tabBarFrame: CGRect?
@@ -174,22 +184,35 @@ final class SideColumnChromeState {
     }
 
     func setRootClear(_ clear: Bool) {
+        if clear, poppingSettingsDetailOwner != nil { poppingSettingsDetailOwner = nil }
         guard rootClear != clear else { return }
         rootClear = clear
     }
 
-    func claimSettingsDetailBack(_ action: @escaping @MainActor () -> Void) {
+    func claimSettingsDetailBack(owner: UUID, _ action: @escaping @MainActor () -> Void) {
+        settingsDetailBackOwner = owner
         settingsDetailBackAction = action
-        showsSettingsDetailBack = true
+        if poppingSettingsDetailOwner != nil { poppingSettingsDetailOwner = nil }
+        if !showsSettingsDetailBack { showsSettingsDetailBack = true }
     }
 
-    func releaseSettingsDetailBack() {
+    func releaseSettingsDetailBack(owner: UUID) {
+        if poppingSettingsDetailOwner == owner, rootClear { poppingSettingsDetailOwner = nil }
+        guard settingsDetailBackOwner == owner else { return }
+        settingsDetailBackOwner = nil
         settingsDetailBackAction = nil
         showsSettingsDetailBack = false
     }
 
+    /// The back leaves the capsule on the tap, while the page slides. Waiting for
+    /// `onDisappear` left a tall capsule on the root that snapped shut after the pop.
     func performSettingsDetailBack() {
-        settingsDetailBackAction?()
+        let action = settingsDetailBackAction
+        poppingSettingsDetailOwner = settingsDetailBackOwner
+        settingsDetailBackOwner = nil
+        settingsDetailBackAction = nil
+        showsSettingsDetailBack = false
+        action?()
     }
 
     func update(
@@ -265,5 +288,48 @@ final class SideColumnChromeState {
         case .sideColumn:
             return false
         }
+    }
+}
+
+/// A pushed Settings page on the upright Duo. iOS parks the bar's back control where the
+/// side-column bell draws, so the bell hid it. The back moves into the capsule under the bell.
+private struct SideColumnDetailBack: ViewModifier {
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.milehoundLayout) private var layout
+    @Bindable private var chrome = SideColumnChromeState.shared
+    @State private var owner = UUID()
+    @State private var isVisible = false
+
+    private var parksBackUnderBell: Bool {
+        isVisible && chrome.uprightDuoCapsuleFrame(buttonCount: 1, layout: layout) != nil
+    }
+
+    func body(content: Content) -> some View {
+        content
+            .navigationBarBackButtonHidden(parksBackUnderBell)
+            .onAppear {
+                isVisible = true
+                sync()
+            }
+            .onDisappear {
+                isVisible = false
+                sync()
+            }
+            .onChange(of: parksBackUnderBell) { _, _ in sync() }
+    }
+
+    private func sync() {
+        if parksBackUnderBell {
+            chrome.claimSettingsDetailBack(owner: owner) { dismiss() }
+        } else {
+            chrome.releaseSettingsDetailBack(owner: owner)
+        }
+    }
+}
+
+extension View {
+    /// Every page pushed from Settings uses this, or the Duo bell covers its back.
+    func sideColumnDetailBack() -> some View {
+        modifier(SideColumnDetailBack())
     }
 }

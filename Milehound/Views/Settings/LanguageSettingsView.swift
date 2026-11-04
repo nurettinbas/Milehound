@@ -38,6 +38,7 @@ struct LanguageSettingsView: View {
         }
         .navigationTitle(L10n.settingsLanguageSection)
         .navigationBarTitleDisplayMode(.inline)
+        .sideColumnDetailBack()
         .glassListChrome()
         .accessibilityIdentifier("settings.language.list")
     }

@@ -4,19 +4,10 @@ import SwiftUI
 /// Favorite places, categories, and smart categories. Kept off the Settings root so that list stays short.
 struct PlacesSettingsView: View {
     @Environment(\.modelContext) private var modelContext
-    @Environment(\.dismiss) private var dismiss
-    @Environment(\.milehoundLayout) private var layout
     @Query private var places: [SavedPlace]
     @Bindable private var settings = AppSettings.shared
-    @Bindable private var sideColumnChrome = SideColumnChromeState.shared
     @FocusState private var focusedField: SettingsFocusedField?
     @State private var showAddPlacePicker = false
-
-    /// The Duo side column already holds the bell. The bar’s back control lands beside it.
-    private var parksBackUnderBell: Bool {
-        sideColumnChrome.rootClear
-            && sideColumnChrome.uprightDuoCapsuleFrame(buttonCount: 1, layout: layout) != nil
-    }
 
     var body: some View {
         Form {
@@ -42,6 +33,7 @@ struct PlacesSettingsView: View {
                 ForEach(Array(places.enumerated()), id: \.element.id) { index, place in
                     NavigationLink {
                         PlacePickerView(editingPlace: place)
+                            .sideColumnDetailBack()
                     } label: {
                         HStack(spacing: 10) {
                             Image(systemName: place.kind.systemImage)
@@ -115,10 +107,7 @@ struct PlacesSettingsView: View {
         }
         .navigationTitle(L10n.settingsPlacesSection)
         .navigationBarTitleDisplayMode(.inline)
-        .navigationBarBackButtonHidden(parksBackUnderBell)
-        .onAppear { syncSideColumnBack() }
-        .onDisappear { sideColumnChrome.releaseSettingsDetailBack() }
-        .onChange(of: parksBackUnderBell) { _, _ in syncSideColumnBack() }
+        .sideColumnDetailBack()
         .glassListChrome()
         .dismissKeyboardOnTap(focus: $focusedField)
         .dismissKeyboardOnScroll()
@@ -132,14 +121,7 @@ struct PlacesSettingsView: View {
         )
         .navigationDestination(isPresented: $showAddPlacePicker) {
             PlacePickerView()
-        }
-    }
-
-    private func syncSideColumnBack() {
-        if parksBackUnderBell {
-            sideColumnChrome.claimSettingsDetailBack { dismiss() }
-        } else {
-            sideColumnChrome.releaseSettingsDetailBack()
+                .sideColumnDetailBack()
         }
     }
 

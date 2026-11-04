@@ -377,6 +377,7 @@ struct SettingsView: View {
                     .glassRow(position: .middle)
                 NavigationLink {
                     AcknowledgementsView()
+                        .sideColumnDetailBack()
                 } label: {
                     HStack {
                         Text(L10n.settingsAcknowledgements)
@@ -431,7 +432,7 @@ struct SettingsView: View {
         .navigationBarTitleDisplayMode(.inline)
         // The split already paints the shell. A second atmosphere clipped to this
         // pane is a different-colored plate behind the form.
-        .glassListChrome(showsAtmosphere: !layout.isPhoneBook)
+        .glassListChrome(showsAtmosphere: layout.settingsChrome == .form)
         .dismissKeyboardOnTap(focus: $focusedField)
         .dismissKeyboardOnScroll()
         .fieldKeyboardAccessory(
