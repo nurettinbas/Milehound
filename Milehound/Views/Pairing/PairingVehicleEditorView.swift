@@ -927,6 +927,8 @@ extension View {
 private struct VehicleEditorUnsavedChangesGuard: ViewModifier {
     @Binding var hasUnsavedChanges: Bool
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.milehoundLayout) private var layout
+    @Bindable private var sideColumnChrome = SideColumnChromeState.shared
     @State private var showDiscardConfirm = false
 
     func body(content: Content) -> some View {
@@ -950,9 +952,15 @@ private struct VehicleEditorUnsavedChangesGuard: ViewModifier {
     private func backChrome(_ content: Content) -> some View {
         if #available(iOS 26.0, *) {
             content
-                .navigationBarBackButtonHidden(hasUnsavedChanges)
-                .toolbar {
+                .sideColumnDetailBack(hidesBarBack: hasUnsavedChanges) { pop in
                     if hasUnsavedChanges {
+                        showDiscardConfirm = true
+                    } else {
+                        pop()
+                    }
+                }
+                .toolbar {
+                    if hasUnsavedChanges, !sideColumnChrome.parksDetailBack(layout: layout) {
                         ToolbarItem(placement: .topBarLeading) {
                             GlassToolbarBackButton {
                                 showDiscardConfirm = true

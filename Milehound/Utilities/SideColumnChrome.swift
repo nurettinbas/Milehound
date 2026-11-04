@@ -204,15 +204,18 @@ final class SideColumnChromeState {
         showsSettingsDetailBack = false
     }
 
+    func performSettingsDetailBack() {
+        settingsDetailBackAction?()
+    }
+
     /// The back leaves the capsule on the tap, while the page slides. Waiting for
     /// `onDisappear` left a tall capsule on the root that snapped shut after the pop.
-    func performSettingsDetailBack() {
-        let action = settingsDetailBackAction
-        poppingSettingsDetailOwner = settingsDetailBackOwner
+    func beginSettingsDetailPop(owner: UUID) {
+        guard settingsDetailBackOwner == owner else { return }
+        poppingSettingsDetailOwner = owner
         settingsDetailBackOwner = nil
         settingsDetailBackAction = nil
         showsSettingsDetailBack = false
-        action?()
     }
 
     func update(
@@ -291,9 +294,23 @@ final class SideColumnChromeState {
     }
 }
 
-/// A pushed Settings page on the upright Duo. iOS parks the bar's back control where the
-/// side-column bell draws, so the bell hid it. The back moves into the capsule under the bell.
+extension SideColumnChromeState {
+    /// Bell plus back fit in the side column. A page that hides its bar back must check
+    /// the pair, or a short column drops the capsule and leaves no back at all.
+    func parksDetailBack(layout: MilehoundLayoutSnapshot) -> Bool {
+        uprightDuoCapsuleFrame(buttonCount: 2, layout: layout) != nil
+    }
+}
+
+/// A pushed page on a side tab column (open Duo, closed cover). iOS parks the bar's back
+/// control where the side-column bell draws, so the two overlapped. The back moves into
+/// the capsule under the bell. `onBack` gets the pop and decides when to run it, e.g. after
+/// confirming unsaved edits.
 private struct SideColumnDetailBack: ViewModifier {
+    /// The page hides the bar back for its own reason too. One modifier owns the flag.
+    var hidesBarBack: Bool
+    var onBack: (@MainActor (_ pop: @escaping @MainActor () -> Void) -> Void)?
+
     @Environment(\.dismiss) private var dismiss
     @Environment(\.milehoundLayout) private var layout
     @Bindable private var chrome = SideColumnChromeState.shared
@@ -301,12 +318,12 @@ private struct SideColumnDetailBack: ViewModifier {
     @State private var isVisible = false
 
     private var parksBackUnderBell: Bool {
-        isVisible && chrome.uprightDuoCapsuleFrame(buttonCount: 1, layout: layout) != nil
+        isVisible && chrome.parksDetailBack(layout: layout)
     }
 
     func body(content: Content) -> some View {
         content
-            .navigationBarBackButtonHidden(parksBackUnderBell)
+            .navigationBarBackButtonHidden(parksBackUnderBell || hidesBarBack)
             .onAppear {
                 isVisible = true
                 sync()
@@ -320,7 +337,17 @@ private struct SideColumnDetailBack: ViewModifier {
 
     private func sync() {
         if parksBackUnderBell {
-            chrome.claimSettingsDetailBack(owner: owner) { dismiss() }
+            let onBack = onBack
+            let dismiss = dismiss
+            let chrome = chrome
+            let owner = owner
+            let pop: @MainActor () -> Void = {
+                chrome.beginSettingsDetailPop(owner: owner)
+                dismiss()
+            }
+            chrome.claimSettingsDetailBack(owner: owner) {
+                if let onBack { onBack(pop) } else { pop() }
+            }
         } else {
             chrome.releaseSettingsDetailBack(owner: owner)
         }
@@ -328,8 +355,11 @@ private struct SideColumnDetailBack: ViewModifier {
 }
 
 extension View {
-    /// Every page pushed from Settings uses this, or the Duo bell covers its back.
-    func sideColumnDetailBack() -> some View {
-        modifier(SideColumnDetailBack())
+    /// Every pushed page under a tab uses this, or the side-column bell covers its back.
+    func sideColumnDetailBack(
+        hidesBarBack: Bool = false,
+        onBack: (@MainActor (_ pop: @escaping @MainActor () -> Void) -> Void)? = nil
+    ) -> some View {
+        modifier(SideColumnDetailBack(hidesBarBack: hidesBarBack, onBack: onBack))
     }
 }
