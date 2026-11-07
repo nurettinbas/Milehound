@@ -33,6 +33,9 @@ fastlane/Preview.html
 fastlane/screenshots/**/*.png
 fastlane/test_output
 
+# Generated App Store marketing frames (large binaries)
+AppStoreScreenshots/
+
 # Secrets — never commit
 *.p12
 *.mobileprovision
